@@ -1,28 +1,42 @@
 # Cook With Me — Project Workflow
 
-Master timer PWA for cooking an entire meal. This file tracks work. New requests
-go into **Todo**; finished work moves to **Done**.
+Master meal-timer PWA. One **Start** button launches a whole meal; each dish's
+steps are sequenced so every dish finishes at the same moment. This file tracks
+work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Todo
 
-- [ ] Add a library of preset dishes with common step timings
-      (blocked on the dish-model decision: single-duration vs. multi-step)
+- [ ] Reorder dishes / steps in the editor
+- [ ] Multiple saved meals (pick from a list)
+- [ ] Per-step "now" marker line on the timeline bar (finer than segment fill)
 
 ## In Progress
 
-- (nothing yet)
-
-## Blocked / needs decision
-
-- Multi-step dishes (sear → oven → rest) vs. single total duration per dish.
-  Changes the data model; presets build on top of whichever we pick.
+- (nothing — core is done)
 
 ## Done
 
+- [x] **Core meal-timer rewrite** — full requested feature set:
+  - [x] Data model: dish = { name, emoji, steps[] }; example 3-dish meal seeded
+  - [x] Scheduler: sequence each dish so all finish together (start = mealDur − dishDur)
+  - [x] Stacked dish cards, Wing-Weather visual language (verified via screenshot)
+  - [x] Emoji image per dish line (🍗 🍚 🥦)
+  - [x] Single Start button for the whole meal (+ Pause / Reset)
+  - [x] Hero: overall meal countdown + "next step starts in mm:ss"
+  - [x] Per-dish segmented step-timeline bar with progress fill
+  - [x] Step-start & meal-done alerts (chime + vibration + notification)
+  - [x] Wall-clock persistence: timers survive close/reopen, no reset (verified)
+- [x] **In-app meal editor** — add/edit/remove dishes, steps, and per-dish emoji
+
 - [x] Establish todo-list workflow (this file)
-- [x] Scaffold PWA: manifest, service worker, offline caching
-- [x] Core "master timer" UI: add dishes, steps, compute a synchronized cook schedule
+- [x] Scaffold PWA: manifest, cache-first service worker, offline caching
 - [x] Add app icons (192px, 512px, maskable) generated from a pure-Python renderer
-- [x] Persist meal plans to localStorage so they survive reloads
-- [x] Sound chime + vibration + system notification alerts when a dish fires
-- [x] Set up GitHub Pages deployment workflow
+- [x] Persist state to localStorage
+- [x] Sound chime + vibration + system notification alerts
+- [x] GitHub Pages deploy workflow (publishes repo root on push to `main`)
+
+## Blocked / needs your input
+
+- **Go-live:** GitHub Pages needs (1) `main` to receive this code and (2)
+  Settings → Pages → Source = "GitHub Actions" (one-time, only you can do it).
+  Say the word and I'll open a PR to `main`.

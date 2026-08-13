@@ -1,7 +1,7 @@
 // Cook With Me — service worker
 // Cache-first for the app shell so it works fully offline.
 
-const CACHE = 'cook-with-me-v1';
+const CACHE = 'cook-with-me-v2';
 const ASSETS = [
   './',
   './index.html',
