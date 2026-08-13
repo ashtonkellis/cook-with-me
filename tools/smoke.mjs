@@ -29,6 +29,10 @@ const nextStep = await page.textContent('.next-step');
 console.log('next-step block:', nextStep.replace(/\s+/g, ' ').trim());
 const pills = await page.$$eval('.pill', (ns) => ns.map((n) => n.textContent));
 console.log('pills after start:', pills);
+const activeNote = await page.$eval('.dish .step-note', (n) => n.textContent).catch(() => '(none)');
+console.log('active step note (expect Preheat BBQ note):', activeNote.trim());
+const heroNote = await page.$eval('.next-step .ns-note', (n) => n.textContent).catch(() => '(none)');
+console.log('hero next-step note:', heroNote.trim());
 await page.screenshot({ path: 'tools/shot-running.png' });
 
 // Reload to prove persistence (timer should NOT reset)

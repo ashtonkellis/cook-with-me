@@ -169,6 +169,18 @@ main {
 .dish-count .lbl { color: var(--muted); font-size: 0.9rem; }
 .dish-count.done .num { color: var(--done); }
 
+.step-note {
+  margin: 8px 0 0;
+  padding: 9px 11px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.86rem;
+  color: var(--ink);
+  opacity: 0.92;
+}
+.ns-note { display: block; margin-top: 3px; color: var(--muted); line-height: 1.35; }
+
 /* segmented timeline */
 .timeline-wrap { margin-top: 12px; }
 .segbar {
@@ -232,10 +244,12 @@ main {
 .ed-dish-top { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
 .ed-emoji { width: 52px; text-align: center; font-size: 1.2rem; }
 .ed-name { flex: 1; }
-.ed-steps { display: flex; flex-direction: column; gap: 6px; }
-.ed-step { display: flex; gap: 6px; align-items: center; }
+.ed-steps { display: flex; flex-direction: column; gap: 10px; }
+.ed-step { display: flex; flex-direction: column; gap: 6px; }
+.ed-step-main { display: flex; gap: 6px; align-items: center; }
 .ed-step .ed-step-label { flex: 1; }
 .ed-step .ed-step-min { width: 74px; }
+.ed-step .ed-step-note { font-size: 0.85rem; opacity: 0.95; }
 .ed-remove { background: none; border: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; padding: 0 6px; }
 .ed-addstep { align-self: flex-start; margin-top: 4px; }
 

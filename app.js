@@ -10,25 +10,25 @@ const EXAMPLE_MEAL = {
     {
       id: 'chicken', name: 'Chicken thighs', emoji: '🍗',
       steps: [
-        { label: 'Preheat BBQ', minutes: 5 },
-        { label: 'Cook side 1', minutes: 8 },
-        { label: 'Cook side 2', minutes: 8 },
+        { label: 'Preheat BBQ', minutes: 5, note: 'Medium-high, ~450°F. Oil the grates.' },
+        { label: 'Cook side 1', minutes: 8, note: 'Skin-side down. Don’t move them — let the skin crisp.' },
+        { label: 'Cook side 2', minutes: 8, note: 'Flip once. Pull at 175°F internal.' },
       ],
     },
     {
       id: 'rice', name: 'Rice', emoji: '🍚',
       steps: [
-        { label: 'Set up Instant Pot', minutes: 3 },
-        { label: 'Measure & wash rice', minutes: 3 },
-        { label: 'Cook rice', minutes: 10 },
+        { label: 'Set up Instant Pot', minutes: 3, note: 'Add rinsed rice + 1:1 water. Seal, valve to Sealing.' },
+        { label: 'Measure & wash rice', minutes: 3, note: '2 cups rice, rinse until water runs clear.' },
+        { label: 'Cook rice', minutes: 10, note: 'Instant Pot: Manual / Pressure Cook, 3 min, then natural release.' },
       ],
     },
     {
       id: 'veggies', name: 'Stir-fried veggies', emoji: '🥦',
       steps: [
-        { label: 'Prep veggies', minutes: 6 },
-        { label: 'Preheat pan', minutes: 3 },
-        { label: 'Cook veggies', minutes: 10 },
+        { label: 'Prep veggies', minutes: 6, note: 'Broccoli, peppers, snap peas — bite-size, uniform.' },
+        { label: 'Preheat pan', minutes: 3, note: 'Wok or skillet, high heat, 1 tbsp oil until shimmering.' },
+        { label: 'Cook veggies', minutes: 10, note: 'Toss constantly. Add garlic + soy at the end.' },
       ],
     },
   ],
@@ -258,7 +258,7 @@ function renderHero() {
   const nextHtml = upcoming
     ? `<div class="next-step">
          <span class="ns-emoji">${escapeHtml(upcoming.dish.emoji)}</span>
-         <span class="ns-text"><strong>Next: ${escapeHtml(upcoming.step.label)}</strong><small>${escapeHtml(upcoming.dish.name)}</small></span>
+         <span class="ns-text"><strong>Next: ${escapeHtml(upcoming.step.label)}</strong><small>${escapeHtml(upcoming.dish.name)}</small>${upcoming.step.note ? `<small class="ns-note">📝 ${escapeHtml(upcoming.step.note)}</small>` : ''}</span>
          <span class="ns-count">${fmtDur(upcoming.at - elapsed)}</span>
        </div>`
     : `<div class="next-step">
@@ -295,12 +295,14 @@ function renderDishes() {
     let bigNum = '';
     let bigLbl = '';
     let pillText = 'Waiting';
+    let stepNote = '';       // note for the currently relevant step
 
     if (!run.started || elapsed < d.startMs) {
       stName = 'waiting';
       pillText = d.startMs === 0 ? 'Starts at go' : 'Waiting';
       bigNum = run.started ? fmtDur(d.startMs - elapsed) : fmtDur(d.durationMs);
       bigLbl = run.started ? `until start · ${d.steps[0].label}` : `${d.steps.length} steps · ${Math.round(d.durationMs / MIN)} min`;
+      if (run.started) stepNote = d.steps[0].note || ''; // heads-up for the first step
     } else if (elapsed >= d.endMs) {
       stName = 'done';
       pillText = 'Done';
@@ -314,6 +316,7 @@ function renderDishes() {
       const idx = d.steps.indexOf(cur);
       const next = d.steps[idx + 1];
       bigLbl = `${cur.label}${next ? ` → then ${next.label}` : ''}`;
+      stepNote = cur.note || '';
     }
 
     const card = document.createElement('section');
@@ -352,6 +355,7 @@ function renderDishes() {
         <span class="num">${bigNum}</span>
         <span class="lbl">${escapeHtml(bigLbl)}</span>
       </div>
+      ${stepNote ? `<p class="step-note">📝 ${escapeHtml(stepNote)}</p>` : ''}
       <div class="timeline-wrap">
         <div class="segbar" style="--st:${stateColor(stName)}">${segs}</div>
         <div class="seg-legend"><span>start</span><span>done together</span></div>
@@ -424,9 +428,12 @@ function renderEditor() {
     wrap.className = 'ed-dish';
     const steps = d.steps.map((s, si) => `
       <div class="ed-step" data-di="${di}" data-si="${si}">
-        <input class="ed-step-label" value="${escapeHtml(s.label)}" placeholder="Step" />
-        <input class="ed-step-min" type="number" min="1" value="${s.minutes}" inputmode="numeric" />
-        <button class="ed-remove ed-remove-step" aria-label="Remove step">✕</button>
+        <div class="ed-step-main">
+          <input class="ed-step-label" value="${escapeHtml(s.label)}" placeholder="Step" />
+          <input class="ed-step-min" type="number" min="1" value="${s.minutes}" inputmode="numeric" />
+          <button class="ed-remove ed-remove-step" aria-label="Remove step">✕</button>
+        </div>
+        <input class="ed-step-note" value="${escapeHtml(s.note || '')}" placeholder="Note (optional) — e.g. Instant Pot: Manual, 3 min" />
       </div>`).join('');
     wrap.innerHTML = `
       <div class="ed-dish-top">
@@ -449,6 +456,7 @@ function syncDraftFromDom() {
     de.querySelectorAll('.ed-step').forEach((se, si) => {
       draft.dishes[di].steps[si].label = se.querySelector('.ed-step-label').value.trim() || 'Step';
       draft.dishes[di].steps[si].minutes = Math.max(1, parseInt(se.querySelector('.ed-step-min').value, 10) || 1);
+      draft.dishes[di].steps[si].note = se.querySelector('.ed-step-note').value.trim();
     });
   });
 }
@@ -480,13 +488,13 @@ el.editorDishes.addEventListener('click', (e) => {
     renderEditor();
   } else if (t.classList.contains('ed-addstep')) {
     syncDraftFromDom();
-    draft.dishes[+t.dataset.di].steps.push({ label: 'New step', minutes: 5 });
+    draft.dishes[+t.dataset.di].steps.push({ label: 'New step', minutes: 5, note: '' });
     renderEditor();
   }
 });
 el.addDish.addEventListener('click', () => {
   syncDraftFromDom();
-  draft.dishes.push({ id: uid(), name: 'New dish', emoji: '🍽️', steps: [{ label: 'Step', minutes: 5 }] });
+  draft.dishes.push({ id: uid(), name: 'New dish', emoji: '🍽️', steps: [{ label: 'Step', minutes: 5, note: '' }] });
   renderEditor();
 });
 el.editBtn.addEventListener('click', openEditor);

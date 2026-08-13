@@ -35,6 +35,8 @@ work — new requests go into **Todo**, finished work moves to **Done**.
   - [x] Wall-clock persistence: timers survive close/reopen, no reset (verified)
 - [x] **In-app meal editor** — add/edit/remove dishes, steps, and per-dish emoji
 - [x] **Version indicator in the UI** + single-source versioning (`version.js`)
+- [x] **Per-step notes** — optional note on each step (settings, temps, reminders),
+      shown in the active dish card + hero next-step, editable in the editor
 - [x] **Project memory** (`CLAUDE.md`) capturing todo, versioning, deploy workflows
 
 - [x] Establish todo-list workflow (this file)
