@@ -14,13 +14,13 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
 - When idle, work on the next item in **Todo**.
 
 ### Versioning workflow
-- The version lives in ONE place: `version.js` (`self.APP_VERSION`).
-- The UI shows it in the footer (`v1.2.3`); the service worker names its cache
+- The version lives in ONE place: `version.js` (`self.APP_VERSION`) — a simple
+  whole number (`'1'`, `'2'`, `'3'`…), NOT semver.
+- The UI shows it in the footer as `V1`; the service worker names its cache
   after it, so bumping the version busts the old offline cache.
-- **On every deploy, bump `version.js`** using semver:
-  patch (`x.y.Z`) for a fix, minor (`x.Y.0`) for a feature, major for a rewrite.
+- **On every deploy, increment `version.js` by 1** (V1 → V2 → V3…).
 - **After deploying, always tell the user which version they should see** once
-  the deploy finishes (e.g. "you should now see v1.0.1"). This lets them confirm
+  the deploy finishes (e.g. "you should now see V2"). This lets them confirm
   the fix landed and the cache refreshed.
 
 ### Deployment workflow

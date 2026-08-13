@@ -506,7 +506,7 @@ el.resetExample.addEventListener('click', () => {
 // ---------- Boot ----------
 function init() {
   const vEl = document.getElementById('version');
-  if (vEl) vEl.textContent = 'v' + (self.APP_VERSION || '0.0.0');
+  if (vEl) vEl.textContent = 'V' + (self.APP_VERSION || '0');
 
   meal = loadMeal();
   meal.dishes.forEach((d) => { if (!d.id) d.id = uid(); });

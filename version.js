@@ -1,5 +1,6 @@
 // Single source of truth for the app version.
 // Works in both the page (window) and the service worker (self).
-// Bump this on every deploy — the UI shows it and the service worker uses it
-// to name its cache, so a new version busts the old offline cache.
-self.APP_VERSION = '1.0.0';
+// Simple versioning: a whole number shown as "V1", "V2", "V3"…
+// Bump it by 1 on every deploy — the UI shows it and the service worker names
+// its cache after it, so a new version busts the old offline cache.
+self.APP_VERSION = '1';

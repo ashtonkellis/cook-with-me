@@ -24,10 +24,10 @@ Live: **https://ashtonkellis.github.io/cook-with-me/**
 
 ## Versioning
 
-The current version is shown in the app footer (e.g. `v1.0.0`) and defined in
-one place: `version.js`. It is bumped on every deploy (semver: patch = fix,
-minor = feature, major = rewrite). The service worker names its offline cache
-after the version, so a new deploy automatically refreshes the cached app.
+The current version is shown in the app footer (e.g. `V1`) and defined in one
+place: `version.js` — a simple whole number that increments by 1 on every deploy
+(V1 → V2 → V3…). The service worker names its offline cache after the version,
+so a new deploy automatically refreshes the cached app.
 
 ## Run locally
 
