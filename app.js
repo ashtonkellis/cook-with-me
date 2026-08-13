@@ -47,12 +47,13 @@ let schedule = null;          // derived; see computeSchedule()
 let run = { started: false, runningSince: null, accumMs: 0 };
 let lastElapsedMs = 0;        // for edge-triggered step chimes
 let tickHandle = null;
+let selected = null;          // { di, si } — Gantt block tapped to inspect its note
 
 // ---------- Elements ----------
 const el = {
   hero: document.getElementById('hero'),
   dishes: document.getElementById('dishes'),
-  footerMeta: document.getElementById('footer-meta'),
+  gantt: document.getElementById('gantt'),
   resetExample: document.getElementById('reset-example'),
   editBtn: document.getElementById('edit-btn'),
   editor: document.getElementById('editor'),
@@ -218,8 +219,7 @@ function stateColor(name) {
 
 function render() {
   renderHero();
-  renderDishes();
-  renderFooter();
+  renderGantt();
 }
 
 function renderHero() {
@@ -285,93 +285,80 @@ function renderHero() {
   });
 }
 
-function renderDishes() {
-  const elapsed = elapsedMs();
-  el.dishes.innerHTML = '';
-
-  for (const d of schedule.dishes) {
-    // Determine dish state and headline.
-    let stName = 'waiting';
-    let bigNum = '';
-    let bigLbl = '';
-    let pillText = 'Waiting';
-    let stepNote = '';       // note for the currently relevant step
-
-    if (!run.started || elapsed < d.startMs) {
-      stName = 'waiting';
-      pillText = d.startMs === 0 ? 'Starts at go' : 'Waiting';
-      bigNum = run.started ? fmtDur(d.startMs - elapsed) : fmtDur(d.durationMs);
-      bigLbl = run.started ? `until start · ${d.steps[0].label}` : `${d.steps.length} steps · ${Math.round(d.durationMs / MIN)} min`;
-      if (run.started) stepNote = d.steps[0].note || ''; // heads-up for the first step
-    } else if (elapsed >= d.endMs) {
-      stName = 'done';
-      pillText = 'Done';
-      bigNum = 'Done';
-      bigLbl = 'Ready to plate';
-    } else {
-      stName = 'active';
-      pillText = 'Cooking';
-      const cur = d.steps.find((s) => elapsed >= s.startMs && elapsed < s.endMs) || d.steps[d.steps.length - 1];
-      bigNum = fmtDur(cur.endMs - elapsed);
-      const idx = d.steps.indexOf(cur);
-      const next = d.steps[idx + 1];
-      bigLbl = `${cur.label}${next ? ` → then ${next.label}` : ''}`;
-      stepNote = cur.note || '';
-    }
-
-    const card = document.createElement('section');
-    card.className = 'card dish';
-    card.style.setProperty('--st', stateColor(stName));
-
-    // Segmented timeline
-    const totalLen = d.durationMs || 1;
-    const segs = d.steps.map((s) => {
-      const pct = (s.lenMs / totalLen) * 100;
-      let cls = 'seg';
-      let fillW = 0;
-      if (run.started && elapsed >= s.endMs) { cls += ' complete'; fillW = 100; }
-      else if (run.started && elapsed >= s.startMs) {
-        cls += ' current';
-        fillW = ((elapsed - s.startMs) / s.lenMs) * 100;
-      }
-      const labelHtml = pct >= 14 ? `<span class="seg-label">${escapeHtml(s.label)}</span>` : '';
-      return `<div class="${cls}" style="flex:${pct} 0 0"><div class="fill" style="width:${Math.max(0, Math.min(100, fillW))}%"></div>${labelHtml}</div>`;
-    }).join('');
-
-    const startLbl = d.startMs > 0
-      ? `starts ${Math.round(d.startMs / MIN)} min in`
-      : 'starts at go';
-
-    card.innerHTML = `
-      <div class="dish-head">
-        <div class="dish-emoji">${escapeHtml(d.emoji)}</div>
-        <div class="dish-title">
-          <strong>${escapeHtml(d.name)}</strong>
-          <small>${Math.round(d.durationMs / MIN)} min · ${startLbl}</small>
-        </div>
-        <span class="pill ${stName}">${pillText}</span>
-      </div>
-      <div class="dish-count ${stName === 'done' ? 'done' : ''}">
-        <span class="num">${bigNum}</span>
-        <span class="lbl">${escapeHtml(bigLbl)}</span>
-      </div>
-      ${stepNote ? `<p class="step-note">📝 ${escapeHtml(stepNote)}</p>` : ''}
-      <div class="timeline-wrap">
-        <div class="segbar" style="--st:${stateColor(stName)}">${segs}</div>
-        <div class="seg-legend"><span>start</span><span>done together</span></div>
-      </div>`;
-    el.dishes.appendChild(card);
-  }
+// Distinct hue per dish; steps within a dish graduate in lightness so each
+// block is its own shade — dish = hue, step = shade (easy to grok).
+const DISH_HUES = [38, 199, 152, 344, 264, 24, 96, 320];
+function dishHue(i) { return DISH_HUES[i % DISH_HUES.length]; }
+function stepColor(hue, idx, total) {
+  const l = total <= 1 ? 58 : 48 + Math.round((idx / (total - 1)) * 26); // 48%..74%
+  return `hsl(${hue} 80% ${l}%)`;
 }
 
-function renderFooter() {
-  if (!run.started) {
-    el.footerMeta.textContent = `Tap Start — dishes sequence so all finish at once.`;
-  } else if (isDone()) {
-    el.footerMeta.textContent = `Meal complete. Enjoy!`;
-  } else {
-    el.footerMeta.textContent = isRunning() ? `Cooking… keep the app or your kitchen nearby.` : `Paused.`;
+function renderGantt() {
+  const elapsed = elapsedMs();
+  const mealMs = schedule.mealMs || 1;
+  const pct = (ms) => Math.max(0, Math.min(100, (ms / mealMs) * 100));
+  const nowPct = pct(elapsed);
+
+  const rows = schedule.dishes.map((d, di) => {
+    const hue = dishHue(di);
+
+    // Per-dish status shown in the label gutter.
+    let status, statusCls;
+    if (!run.started) { status = `${Math.round(d.durationMs / MIN)}m`; statusCls = ''; }
+    else if (elapsed < d.startMs) { status = `in ${fmtDur(d.startMs - elapsed)}`; statusCls = 'wait'; }
+    else if (elapsed >= d.endMs) { status = '✓ done'; statusCls = 'done'; }
+    else {
+      const cur = d.steps.find((s) => elapsed >= s.startMs && elapsed < s.endMs) || d.steps[d.steps.length - 1];
+      status = `${fmtDur(cur.endMs - elapsed)} left`; statusCls = 'cook';
+    }
+
+    const segs = d.steps.map((s, si) => {
+      const left = pct(s.startMs), width = Math.max(0.8, pct(s.endMs) - pct(s.startMs));
+      const active = run.started && elapsed >= s.startMs && elapsed < s.endMs;
+      const isSel = selected && selected.di === di && selected.si === si;
+      const wideEnough = width >= 9;
+      return `<div class="gseg${active ? ' active' : ''}${isSel ? ' sel' : ''}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${escapeHtml(s.label)} · ${s.minutes}m${s.note ? ' — ' + escapeHtml(s.note) : ''}">${wideEnough ? `<span>${escapeHtml(s.label)}</span>` : ''}</div>`;
+    }).join('');
+
+    return `
+      <div class="gantt-row">
+        <div class="gantt-label">
+          <span class="ge">${escapeHtml(d.emoji)}</span>
+          <span class="gtxt"><span class="gn">${escapeHtml(d.name)}</span><span class="gs ${statusCls}">${status}</span></span>
+        </div>
+        <div class="gantt-track" style="--hue:${hue}">${segs}</div>
+      </div>`;
+  }).join('');
+
+  const nowLayer = run.started
+    ? `<div class="gantt-now-layer">
+         <div class="gantt-consumed" style="width:${nowPct}%"></div>
+         <div class="gantt-nowline" style="left:${nowPct}%"><span class="now-flag">${isDone() ? 'done' : fmtDur(elapsed)}</span></div>
+       </div>`
+    : '';
+
+  // Detail line: the tapped step's note (or a hint to tap).
+  let detail = '<span class="gantt-sub">tap a block for its note · all finish together →</span>';
+  if (selected) {
+    const sd = schedule.dishes[selected.di];
+    const ss = sd && sd.steps[selected.si];
+    if (ss) {
+      detail = `<span class="gantt-detail">${escapeHtml(sd.emoji)} <b>${escapeHtml(ss.label)}</b> · ${ss.minutes}m${ss.note ? ` — 📝 ${escapeHtml(ss.note)}` : ' — no note'}</span>`;
+    }
   }
+
+  const total = fmtDur(mealMs);
+  el.gantt.innerHTML = `
+    <div class="gantt-head">
+      <span class="gantt-title">Meal timeline</span>
+      ${detail}
+    </div>
+    <div class="gantt-rows">
+      ${rows}
+      ${nowLayer}
+    </div>
+    <div class="gantt-axis"><span>0:00</span><span class="ax-end">serve · ${total}</span></div>`;
 }
 
 // ---------- Alerts (sound + vibration + notification) ----------
@@ -497,6 +484,15 @@ el.addDish.addEventListener('click', () => {
   draft.dishes.push({ id: uid(), name: 'New dish', emoji: '🍽️', steps: [{ label: 'Step', minutes: 5, note: '' }] });
   renderEditor();
 });
+// Tap a Gantt block to inspect its note (toggle off if tapped again).
+el.gantt.addEventListener('click', (e) => {
+  const seg = e.target.closest('.gseg');
+  if (!seg) return;
+  const di = +seg.dataset.di, si = +seg.dataset.si;
+  selected = (selected && selected.di === di && selected.si === si) ? null : { di, si };
+  render();
+});
+
 el.editBtn.addEventListener('click', openEditor);
 el.editorClose.addEventListener('click', closeEditor);
 el.editorCancel.addEventListener('click', closeEditor);

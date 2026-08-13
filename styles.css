@@ -20,23 +20,31 @@
 
 * { box-sizing: border-box; }
 
-html, body { min-height: 100%; }
+html, body { height: 100%; }
 
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: var(--ink);
-  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bot) 60%) fixed;
-  line-height: 1.45;
+  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bot) 70%) fixed;
+  line-height: 1.4;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   -webkit-tap-highlight-color: transparent;
+  /* Fit the whole app on one screen — no page scroll. */
+  height: 100vh;
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* ---- Header ---- */
 .app-header {
+  flex: none;
+  width: 100%;
   max-width: 620px;
   margin: 0 auto;
-  padding: 20px 18px 8px;
+  padding: 12px 18px 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -58,14 +66,17 @@ body {
 
 /* ---- Layout ---- */
 main {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
   max-width: 620px;
   margin: 0 auto;
-  padding: 8px 16px 8px;
+  padding: 6px 14px 6px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  overflow: hidden;
 }
-.dishes { display: flex; flex-direction: column; gap: 14px; }
 
 /* ---- Cards ---- */
 .card {
@@ -88,11 +99,11 @@ main {
 }
 
 /* ---- Hero ---- */
-.hero { background: linear-gradient(180deg, #0f3568, #0a2650); }
+.hero { flex: none; background: linear-gradient(180deg, #0f3568, #0a2650); padding: 14px 16px 14px; }
 .hero-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .hero-label { font-size: 0.8rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
 .hero-clock { font-size: 0.85rem; color: var(--muted); }
-.hero-time { font-size: 3.2rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.05; margin: 2px 0 6px; }
+.hero-time { font-size: 2.7rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.02; margin: 1px 0 4px; }
 .hero-time.small { font-size: 2rem; }
 
 .next-step {
@@ -102,8 +113,8 @@ main {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 10px 12px;
-  margin: 8px 0 14px;
+  padding: 8px 11px;
+  margin: 6px 0 10px;
 }
 .next-step .ns-emoji { font-size: 1.4rem; }
 .next-step .ns-text { flex: 1; min-width: 0; }
@@ -113,11 +124,119 @@ main {
 
 .controls { display: flex; gap: 10px; }
 
+/* ---- Gantt chart ---- */
+.gantt-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 8px;
+  --label-w: 92px;
+  --gap: 10px;
+}
+.gantt-head { flex: none; display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.gantt-title { font-size: 1rem; font-weight: 700; flex: none; }
+.gantt-sub { font-size: 0.74rem; color: var(--muted); }
+.gantt-head > :not(.gantt-title) {
+  margin-left: auto; min-width: 0; text-align: right;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gantt-detail { font-size: 0.76rem; color: var(--ink); }
+.gantt-detail b { color: var(--active); }
+.gseg { cursor: pointer; }
+.gseg.sel { box-shadow: 0 0 0 2px var(--accent), 0 0 12px 1px hsl(var(--hue) 90% 60% / 0.5); z-index: 3; }
+
+.gantt-rows {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 8px;
+  padding: 2px 0;
+}
+.gantt-row {
+  display: grid;
+  grid-template-columns: var(--label-w) 1fr;
+  column-gap: var(--gap);
+  align-items: center;
+}
+.gantt-label { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.gantt-label .ge {
+  font-size: 1.15rem; width: 30px; height: 30px; flex: none;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 8px;
+}
+.gantt-label .gtxt { min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+.gantt-label .gn {
+  font-size: 0.82rem; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gantt-label .gs { font-size: 0.7rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.gantt-label .gs.cook { color: var(--active); font-weight: 700; }
+.gantt-label .gs.done { color: var(--done); font-weight: 700; }
+
+.gantt-track {
+  position: relative;
+  height: 40px;
+  background: var(--track);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.gseg {
+  position: absolute; top: 0; bottom: 0;
+  border-radius: 7px;
+  display: flex; align-items: center;
+  padding: 0 7px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  z-index: 1;
+}
+.gseg span {
+  font-size: 0.68rem; font-weight: 700; color: #0a1a2e;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gseg.active { z-index: 3; box-shadow: 0 0 0 2px rgba(255,255,255,0.6), 0 0 12px 1px hsl(var(--hue) 90% 60% / 0.55); }
+
+/* Overlay across all track columns: consumed mask + now line */
+.gantt-now-layer {
+  position: absolute; top: 0; bottom: 0;
+  left: calc(var(--label-w) + var(--gap)); right: 0;
+  pointer-events: none;
+}
+.gantt-consumed {
+  position: absolute; top: 0; bottom: 0; left: 0;
+  background: rgba(1, 8, 20, 0.55);
+  border-right: 0;
+  z-index: 2;
+}
+.gantt-nowline {
+  position: absolute; top: -2px; bottom: -2px; width: 2px;
+  background: #fff;
+  box-shadow: 0 0 8px 1px rgba(255, 255, 255, 0.7);
+  z-index: 4;
+}
+.gantt-nowline .now-flag {
+  position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+  font-size: 0.62rem; font-weight: 700; color: var(--bg-bot);
+  background: #fff; border-radius: 5px; padding: 1px 5px;
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.gantt-axis {
+  flex: none;
+  display: flex; justify-content: space-between;
+  padding-left: calc(var(--label-w) + var(--gap));
+  margin-top: 6px;
+  font-size: 0.68rem; color: var(--muted);
+}
+.gantt-axis .ax-end { color: var(--done); font-weight: 600; }
+
 /* ---- Buttons ---- */
 .btn {
   font-size: 1rem;
   font-weight: 700;
-  padding: 13px 18px;
+  padding: 11px 18px;
   border-radius: 13px;
   border: 1px solid transparent;
   cursor: pointer;
@@ -180,7 +299,10 @@ main {
   color: var(--ink);
   opacity: 0.92;
 }
-.ns-note { display: block; margin-top: 3px; color: var(--muted); line-height: 1.35; }
+.ns-note {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  margin-top: 3px; color: var(--muted); line-height: 1.3;
+}
 
 /* segmented timeline */
 .timeline-wrap { margin-top: 12px; }
@@ -211,13 +333,14 @@ main {
 
 /* ---- Footer ---- */
 .app-footer {
+  flex: none;
+  width: 100%;
   max-width: 620px;
   margin: 0 auto;
-  padding: 18px 16px 32px;
-  text-align: center;
+  padding: 6px 16px calc(6px + env(safe-area-inset-bottom));
   color: var(--muted);
-  font-size: 0.82rem;
-  display: flex; flex-direction: column; gap: 6px; align-items: center;
+  font-size: 0.78rem;
+  display: flex; flex-direction: row; gap: 14px; align-items: center; justify-content: center;
 }
 
 /* ---- Editor ---- */

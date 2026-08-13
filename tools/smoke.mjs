@@ -15,10 +15,26 @@ const version = await page.textContent('#version');
 console.log('version shown:', version.trim());
 const heroTime = await page.textContent('.hero-time');
 console.log('hero time (expect 21:00):', heroTime.trim());
-const dishCount = await page.$$eval('.dish', (n) => n.length);
-console.log('dish cards (expect 3):', dishCount);
-const startLabels = await page.$$eval('.dish-title small', (ns) => ns.map((n) => n.textContent));
-console.log('dish sublabels:', startLabels);
+const lanes = await page.$$eval('.gantt-row', (n) => n.length);
+console.log('gantt lanes (expect 3):', lanes);
+
+// No page scroll — the whole app fits the viewport.
+const scroll = await page.evaluate(() => ({
+  scrollH: document.body.scrollHeight, client: document.documentElement.clientHeight,
+  overflowY: getComputedStyle(document.body).overflowY,
+}));
+console.log('no-scroll check:', JSON.stringify(scroll), '=>', scroll.scrollH <= scroll.client + 1 ? 'FITS' : 'SCROLLS');
+
+// CONFIRM synchronized finish: every dish's last step must end at 100% of the
+// meal timeline (right edge). Read each lane's last block's left+width.
+const ends = await page.$$eval('.gantt-row', (rows) => rows.map((r) => {
+  const segs = [...r.querySelectorAll('.gseg')];
+  const last = segs[segs.length - 1];
+  const left = parseFloat(last.style.left), width = parseFloat(last.style.width);
+  return Math.round((left + width) * 10) / 10;
+}));
+console.log('dish end % (all must be 100):', JSON.stringify(ends),
+  '=>', ends.every((e) => Math.abs(e - 100) < 0.5) ? 'ALL FINISH TOGETHER ✓' : 'MISALIGNED ✗');
 
 await page.screenshot({ path: 'tools/shot-idle.png' });
 
@@ -27,12 +43,18 @@ await page.click('#start-btn');
 await page.waitForTimeout(600);
 const nextStep = await page.textContent('.next-step');
 console.log('next-step block:', nextStep.replace(/\s+/g, ' ').trim());
-const pills = await page.$$eval('.pill', (ns) => ns.map((n) => n.textContent));
-console.log('pills after start:', pills);
-const activeNote = await page.$eval('.dish .step-note', (n) => n.textContent).catch(() => '(none)');
-console.log('active step note (expect Preheat BBQ note):', activeNote.trim());
+const statuses = await page.$$eval('.gantt-label .gs', (ns) => ns.map((n) => n.textContent));
+console.log('lane statuses after start:', statuses);
+const nowline = await page.$('.gantt-nowline');
+console.log('now-line present:', !!nowline);
 const heroNote = await page.$eval('.next-step .ns-note', (n) => n.textContent).catch(() => '(none)');
 console.log('hero next-step note:', heroNote.trim());
+
+// Tap a Gantt block -> its note shows in the detail line
+await page.click('.gantt-row:first-child .gseg:first-child');
+await page.waitForTimeout(150);
+const detail = await page.$eval('.gantt-detail', (n) => n.textContent).catch(() => '(none)');
+console.log('tapped-block detail:', detail.trim());
 await page.screenshot({ path: 'tools/shot-running.png' });
 
 // Reload to prove persistence (timer should NOT reset)
@@ -55,8 +77,8 @@ await page.evaluate(() => {
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
 const doneHero = await page.textContent('.hero-time');
-const donePills = await page.$$eval('.pill', (ns) => ns.map((n) => n.textContent));
-console.log('done hero (expect Ready):', doneHero.trim(), '| pills:', donePills);
+const doneStatuses = await page.$$eval('.gantt-label .gs', (ns) => ns.map((n) => n.textContent));
+console.log('done hero (expect Ready):', doneHero.trim(), '| lane statuses:', doneStatuses);
 
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no console/page errors');
 await browser.close();

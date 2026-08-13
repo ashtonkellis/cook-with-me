@@ -8,7 +8,10 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 - [ ] Reorder dishes / steps in the editor
 - [ ] Multiple saved meals (pick from a list)
-- [ ] Per-step "now" marker line on the timeline bar (finer than segment fill)
+
+## In Progress
+
+- (nothing)
 
 ## Recently added workflows (see CLAUDE.md)
 
@@ -41,6 +44,11 @@ work — new requests go into **Todo**, finished work moves to **Done**.
       192/512/maskable via `tools/resize_icon.py` (retired the placeholder SVG)
 - [x] **Palette matched to the icon** — royal navy bg, amber (#fca602) & leaf
       green (#37c57b) accents, sampled directly from the icon art
+- [x] **No-scroll layout** — the whole app fits one screen (verified: FITS)
+- [x] **Gantt-chart timeline** — dishes as lanes, colored step blocks (dish=hue,
+      step=shade), a sweeping "now" line, tap a block to read its note
+- [x] **Confirmed synchronized finish** — smoke test asserts every dish ends at
+      100% of the timeline (all finish together ✓)
 - [x] **Project memory** (`CLAUDE.md`) capturing todo, versioning, deploy workflows
 
 - [x] Establish todo-list workflow (this file)
