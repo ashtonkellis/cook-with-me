@@ -37,6 +37,8 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 - [x] **Version indicator in the UI** + single-source versioning (`version.js`)
 - [x] **Per-step notes** — optional note on each step (settings, temps, reminders),
       shown in the active dish card + hero next-step, editable in the editor
+- [x] **Custom app icon** — user-provided skillet/timer art, resized to
+      192/512/maskable via `tools/resize_icon.py` (retired the placeholder SVG)
 - [x] **Project memory** (`CLAUDE.md`) capturing todo, versioning, deploy workflows
 
 - [x] Establish todo-list workflow (this file)
