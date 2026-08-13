@@ -6,6 +6,8 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Todo
 
+- [ ] **Shared steps** — steps like "Preheat BBQ" shouldn't be repeated across
+      dishes; show in the UI that it's already done by an earlier dish's step
 - [ ] Reorder dishes / steps in the editor
 - [ ] Multiple saved meals (pick from a list)
 
@@ -49,6 +51,11 @@ work — new requests go into **Todo**, finished work moves to **Done**.
       step=shade), a sweeping "now" line, tap a block to read its note
 - [x] **Confirmed synchronized finish** — smoke test asserts every dish ends at
       100% of the timeline (all finish together ✓)
+- [x] **Include/exclude dishes** — checkbox per dish in the idle Gantt; schedule
+      re-balances live so included dishes finish together; Start disabled if none
+- [x] **Dish library expanded** — added BBQ steak, BBQ chicken breast, BBQ corn,
+      boiled veggies, and fast test chicken/rice/veggies (test dishes selected
+      by default for a ~15s end-to-end run)
 - [x] **Project memory** (`CLAUDE.md`) capturing todo, versioning, deploy workflows
 
 - [x] Establish todo-list workflow (this file)

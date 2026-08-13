@@ -131,7 +131,7 @@ main {
   display: flex;
   flex-direction: column;
   padding: 12px 14px 8px;
-  --label-w: 92px;
+  --label-w: 118px;
   --gap: 10px;
 }
 .gantt-head { flex: none; display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
@@ -153,21 +153,34 @@ main {
   display: flex;
   flex-direction: column;
   justify-content: space-evenly;
-  gap: 8px;
+  gap: 9px;
   padding: 2px 0;
+  overflow-y: auto;
 }
 .gantt-row {
   display: grid;
   grid-template-columns: var(--label-w) 1fr;
   column-gap: var(--gap);
   align-items: center;
+  min-height: 44px;
+  flex: none;
 }
-.gantt-label { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.gantt-row.excluded { opacity: 0.5; }
+.gantt-label { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .gantt-label .ge {
-  font-size: 1.15rem; width: 30px; height: 30px; flex: none;
+  font-size: 1.05rem; width: 26px; height: 26px; flex: none;
   display: grid; place-items: center;
   background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 8px;
 }
+.dish-check {
+  flex: none; width: 22px; height: 22px; padding: 0;
+  border-radius: 6px; cursor: pointer;
+  border: 2px solid var(--muted); background: transparent;
+  color: #05261a; font-size: 0.85rem; font-weight: 900; line-height: 1;
+  display: grid; place-items: center;
+}
+.dish-check.on { background: var(--done); border-color: var(--done); }
+.dish-check:active { transform: scale(0.92); }
 .gantt-label .gtxt { min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
 .gantt-label .gn {
   font-size: 0.82rem; font-weight: 600;
@@ -176,6 +189,7 @@ main {
 .gantt-label .gs { font-size: 0.7rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .gantt-label .gs.cook { color: var(--active); font-weight: 700; }
 .gantt-label .gs.done { color: var(--done); font-weight: 700; }
+.gantt-label .gs.off { color: var(--muted); opacity: 0.8; }
 
 .gantt-track {
   position: relative;

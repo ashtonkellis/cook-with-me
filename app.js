@@ -3,12 +3,15 @@
 // every dish finishes at the same moment. Timers are derived from an absolute
 // start timestamp (wall clock), so closing/reopening never resets progress.
 
-// ---------- Example meal (seed) ----------
+// ---------- Seed dish library ----------
+// `included` picks which dishes are in tonight's meal (chosen via checkboxes
+// before starting). By default only the fast TEST dishes are selected, so the
+// app opens ready for a ~15-second end-to-end run.
 const EXAMPLE_MEAL = {
-  name: 'Weeknight BBQ',
+  name: 'BBQ cookout',
   dishes: [
     {
-      id: 'chicken', name: 'Chicken thighs', emoji: '🍗',
+      id: 'chicken', name: 'Chicken thighs', emoji: '🍗', included: false,
       steps: [
         { label: 'Preheat BBQ', minutes: 5, note: 'Medium-high, ~450°F. Oil the grates.' },
         { label: 'Cook side 1', minutes: 8, note: 'Skin-side down. Don’t move them — let the skin crisp.' },
@@ -16,7 +19,7 @@ const EXAMPLE_MEAL = {
       ],
     },
     {
-      id: 'rice', name: 'Rice', emoji: '🍚',
+      id: 'rice', name: 'Rice', emoji: '🍚', included: false,
       steps: [
         { label: 'Set up Instant Pot', minutes: 3, note: 'Add rinsed rice + 1:1 water. Seal, valve to Sealing.' },
         { label: 'Measure & wash rice', minutes: 3, note: '2 cups rice, rinse until water runs clear.' },
@@ -24,11 +27,69 @@ const EXAMPLE_MEAL = {
       ],
     },
     {
-      id: 'veggies', name: 'Stir-fried veggies', emoji: '🥦',
+      id: 'veggies', name: 'Stir-fried veggies', emoji: '🥦', included: false,
       steps: [
         { label: 'Prep veggies', minutes: 6, note: 'Broccoli, peppers, snap peas — bite-size, uniform.' },
         { label: 'Preheat pan', minutes: 3, note: 'Wok or skillet, high heat, 1 tbsp oil until shimmering.' },
         { label: 'Cook veggies', minutes: 10, note: 'Toss constantly. Add garlic + soy at the end.' },
+      ],
+    },
+    {
+      id: 'steak', name: 'BBQ steak', emoji: '🥩', included: false,
+      steps: [
+        { label: 'Preheat BBQ', minutes: 5, note: 'High heat for a good sear.' },
+        { label: 'Cook side 1', minutes: 8 },
+        { label: 'Cook side 2', minutes: 8 },
+        { label: 'Rest', minutes: 5, note: 'Tent with foil — let the juices settle.' },
+      ],
+    },
+    {
+      id: 'chicken-breast', name: 'BBQ chicken breast', emoji: '🐔', included: false,
+      steps: [
+        { label: 'Preheat BBQ', minutes: 5 },
+        { label: 'Cook side 1', minutes: 15 },
+        { label: 'Cook side 2', minutes: 15, note: 'Pull at 165°F internal.' },
+      ],
+    },
+    {
+      id: 'corn', name: 'BBQ corn', emoji: '🌽', included: false,
+      steps: [
+        { label: 'Preheat BBQ', minutes: 5 },
+        { label: 'Side 1', minutes: 5 },
+        { label: 'Side 2', minutes: 5 },
+        { label: 'Side 3', minutes: 5 },
+        { label: 'Side 4', minutes: 5 },
+      ],
+    },
+    {
+      id: 'boiled-veggies', name: 'Boiled veggies', emoji: '🫑', included: false,
+      steps: [
+        { label: 'Boil water', minutes: 5 },
+        { label: 'Cook veggies', minutes: 10 },
+      ],
+    },
+    {
+      id: 'test-chicken', name: 'Test chicken', emoji: '🐔', included: true,
+      steps: [
+        { label: 'Preheat', minutes: 0.08, note: 'Fast test step.' },
+        { label: 'Side 1', minutes: 0.08 },
+        { label: 'Side 2', minutes: 0.08 },
+      ],
+    },
+    {
+      id: 'test-rice', name: 'Test rice', emoji: '🍚', included: true,
+      steps: [
+        { label: 'Setup', minutes: 0.05 },
+        { label: 'Wash', minutes: 0.05 },
+        { label: 'Cook', minutes: 0.08 },
+      ],
+    },
+    {
+      id: 'test-veggies', name: 'Test veggies', emoji: '🥗', included: true,
+      steps: [
+        { label: 'Prep', minutes: 0.05 },
+        { label: 'Preheat', minutes: 0.05 },
+        { label: 'Cook', minutes: 0.08 },
       ],
     },
   ],
@@ -79,36 +140,60 @@ function fmtDur(ms) {
 function fmtClock(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
+// Compact duration for totals: seconds when short (test dishes), else minutes.
+function fmtLen(ms) {
+  return ms < 90 * 1000 ? `${Math.round(ms / 1000)}s` : `${Math.round(ms / MIN)}m`;
+}
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 // ---------- Scheduling ----------
-// Each dish starts at (mealDuration - dishDuration) so all dishes end together.
+// Included dishes each start at (mealDuration - dishDuration) so they all end
+// together. Excluded dishes are kept (for the idle picker) but not scheduled.
 function computeSchedule(m) {
   const dishes = m.dishes.map((d) => {
     const dur = d.steps.reduce((s, st) => s + st.minutes, 0) * MIN;
-    return { ...d, durationMs: dur };
+    return { ...d, included: d.included !== false, durationMs: dur };
   });
-  const mealMs = Math.max(0, ...dishes.map((d) => d.durationMs));
+  const included = dishes.filter((d) => d.included);
+  const mealMs = Math.max(0, ...included.map((d) => d.durationMs));
   for (const d of dishes) {
-    d.startMs = mealMs - d.durationMs;
-    let cursor = d.startMs;
-    d.steps = d.steps.map((st) => {
-      const start = cursor;
-      const len = st.minutes * MIN;
-      cursor += len;
-      return { ...st, lenMs: len, startMs: start, endMs: cursor };
-    });
-    d.endMs = mealMs; // every dish finishes with the meal
+    if (d.included) {
+      d.startMs = mealMs - d.durationMs;
+      let cursor = d.startMs;
+      d.steps = d.steps.map((st) => {
+        const start = cursor;
+        const len = st.minutes * MIN;
+        cursor += len;
+        return { ...st, lenMs: len, startMs: start, endMs: cursor };
+      });
+      d.endMs = mealMs; // every included dish finishes with the meal
+    } else {
+      d.startMs = null;
+      d.endMs = null;
+      d.steps = d.steps.map((st) => ({ ...st, lenMs: st.minutes * MIN, startMs: null, endMs: null }));
+    }
   }
-  return { dishes, mealMs };
+  return { dishes, mealMs, includedCount: included.length };
+}
+
+// Toggle a dish in/out of the meal (only before the meal has started).
+function toggleDish(id) {
+  if (run.started) return;
+  const d = meal.dishes.find((x) => x.id === id);
+  if (!d) return;
+  d.included = !(d.included !== false);
+  saveMeal();
+  schedule = computeSchedule(meal);
+  render();
 }
 
 // Flat, time-ordered list of every step-start across all dishes.
 function allStepStarts() {
   const out = [];
   for (const d of schedule.dishes) {
+    if (!d.included) continue;
     for (const st of d.steps) out.push({ dish: d, step: st, at: st.startMs });
   }
   out.sort((a, b) => a.at - b.at);
@@ -126,6 +211,7 @@ const isRunning = () => run.started && run.runningSince != null;
 const isDone = () => run.started && elapsedMs() >= schedule.mealMs;
 
 function startMeal() {
+  if (!schedule.includedCount) return; // nothing selected
   primeAudio();
   requestNotifyPermission();
   run = { started: true, runningSince: Date.now(), accumMs: 0 };
@@ -227,17 +313,19 @@ function renderHero() {
   const remaining = schedule.mealMs - elapsed;
 
   if (!run.started) {
-    const mins = Math.round(schedule.mealMs / MIN);
+    const n = schedule.includedCount;
+    const none = n === 0;
     el.hero.innerHTML = `
       <div class="hero-top">
         <span class="hero-label">Ready to cook</span>
-        <span class="hero-clock">${schedule.dishes.length} dishes · ~${mins} min</span>
+        <span class="hero-clock">${none ? 'pick dishes below' : `${n} dish${n === 1 ? '' : 'es'} · ~${fmtLen(schedule.mealMs)}`}</span>
       </div>
-      <div class="hero-time">${fmtDur(schedule.mealMs)}</div>
+      <div class="hero-time">${none ? '—' : fmtDur(schedule.mealMs)}</div>
       <div class="controls">
-        <button class="btn primary" id="start-btn">▶ Start meal</button>
+        <button class="btn primary" id="start-btn"${none ? ' disabled' : ''}>▶ Start meal</button>
       </div>`;
-    el.hero.querySelector('#start-btn').addEventListener('click', startMeal);
+    const btn = el.hero.querySelector('#start-btn');
+    if (!none) btn.addEventListener('click', startMeal);
     return;
   }
 
@@ -300,12 +388,16 @@ function renderGantt() {
   const pct = (ms) => Math.max(0, Math.min(100, (ms / mealMs) * 100));
   const nowPct = pct(elapsed);
 
+  const picking = !run.started; // idle: show checkboxes + all dishes
   const rows = schedule.dishes.map((d, di) => {
+    // When running, only included dishes appear.
+    if (run.started && !d.included) return '';
     const hue = dishHue(di);
+    const excluded = !d.included;
 
     // Per-dish status shown in the label gutter.
     let status, statusCls;
-    if (!run.started) { status = `${Math.round(d.durationMs / MIN)}m`; statusCls = ''; }
+    if (!run.started) { status = fmtLen(d.durationMs); statusCls = excluded ? 'off' : ''; }
     else if (elapsed < d.startMs) { status = `in ${fmtDur(d.startMs - elapsed)}`; statusCls = 'wait'; }
     else if (elapsed >= d.endMs) { status = '✓ done'; statusCls = 'done'; }
     else {
@@ -313,17 +405,23 @@ function renderGantt() {
       status = `${fmtDur(cur.endMs - elapsed)} left`; statusCls = 'cook';
     }
 
-    const segs = d.steps.map((s, si) => {
+    // Excluded dishes have no timeline position — show no blocks.
+    const segs = excluded ? '' : d.steps.map((s, si) => {
       const left = pct(s.startMs), width = Math.max(0.8, pct(s.endMs) - pct(s.startMs));
       const active = run.started && elapsed >= s.startMs && elapsed < s.endMs;
       const isSel = selected && selected.di === di && selected.si === si;
       const wideEnough = width >= 9;
-      return `<div class="gseg${active ? ' active' : ''}${isSel ? ' sel' : ''}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${escapeHtml(s.label)} · ${s.minutes}m${s.note ? ' — ' + escapeHtml(s.note) : ''}">${wideEnough ? `<span>${escapeHtml(s.label)}</span>` : ''}</div>`;
+      return `<div class="gseg${active ? ' active' : ''}${isSel ? ' sel' : ''}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${escapeHtml(s.label)} · ${fmtLen(s.lenMs)}${s.note ? ' — ' + escapeHtml(s.note) : ''}">${wideEnough ? `<span>${escapeHtml(s.label)}</span>` : ''}</div>`;
     }).join('');
 
+    const check = picking
+      ? `<button class="dish-check${excluded ? '' : ' on'}" data-id="${escapeHtml(d.id)}" aria-label="${excluded ? 'Include' : 'Exclude'} ${escapeHtml(d.name)}" aria-pressed="${excluded ? 'false' : 'true'}">${excluded ? '' : '✓'}</button>`
+      : '';
+
     return `
-      <div class="gantt-row">
+      <div class="gantt-row${excluded ? ' excluded' : ''}">
         <div class="gantt-label">
+          ${check}
           <span class="ge">${escapeHtml(d.emoji)}</span>
           <span class="gtxt"><span class="gn">${escapeHtml(d.name)}</span><span class="gs ${statusCls}">${status}</span></span>
         </div>
@@ -338,13 +436,13 @@ function renderGantt() {
        </div>`
     : '';
 
-  // Detail line: the tapped step's note (or a hint to tap).
-  let detail = '<span class="gantt-sub">tap a block for its note · all finish together →</span>';
+  // Detail line: the tapped step's note (or a hint).
+  let detail = `<span class="gantt-sub">${picking ? 'check dishes to include · all finish together →' : 'tap a block for its note · all finish together →'}</span>`;
   if (selected) {
     const sd = schedule.dishes[selected.di];
     const ss = sd && sd.steps[selected.si];
     if (ss) {
-      detail = `<span class="gantt-detail">${escapeHtml(sd.emoji)} <b>${escapeHtml(ss.label)}</b> · ${ss.minutes}m${ss.note ? ` — 📝 ${escapeHtml(ss.note)}` : ' — no note'}</span>`;
+      detail = `<span class="gantt-detail">${escapeHtml(sd.emoji)} <b>${escapeHtml(ss.label)}</b> · ${fmtLen(ss.lenMs || (ss.minutes * MIN))}${ss.note ? ` — 📝 ${escapeHtml(ss.note)}` : ' — no note'}</span>`;
     }
   }
 
@@ -417,7 +515,7 @@ function renderEditor() {
       <div class="ed-step" data-di="${di}" data-si="${si}">
         <div class="ed-step-main">
           <input class="ed-step-label" value="${escapeHtml(s.label)}" placeholder="Step" />
-          <input class="ed-step-min" type="number" min="1" value="${s.minutes}" inputmode="numeric" />
+          <input class="ed-step-min" type="number" min="0" step="any" value="${s.minutes}" inputmode="decimal" />
           <button class="ed-remove ed-remove-step" aria-label="Remove step">✕</button>
         </div>
         <input class="ed-step-note" value="${escapeHtml(s.note || '')}" placeholder="Note (optional) — e.g. Instant Pot: Manual, 3 min" />
@@ -442,7 +540,8 @@ function syncDraftFromDom() {
     draft.dishes[di].name = de.querySelector('.ed-name').value.trim() || 'Dish';
     de.querySelectorAll('.ed-step').forEach((se, si) => {
       draft.dishes[di].steps[si].label = se.querySelector('.ed-step-label').value.trim() || 'Step';
-      draft.dishes[di].steps[si].minutes = Math.max(1, parseInt(se.querySelector('.ed-step-min').value, 10) || 1);
+      const mins = parseFloat(se.querySelector('.ed-step-min').value);
+      draft.dishes[di].steps[si].minutes = mins > 0 ? mins : 1; // supports fractional (test) minutes
       draft.dishes[di].steps[si].note = se.querySelector('.ed-step-note').value.trim();
     });
   });
@@ -484,8 +583,10 @@ el.addDish.addEventListener('click', () => {
   draft.dishes.push({ id: uid(), name: 'New dish', emoji: '🍽️', steps: [{ label: 'Step', minutes: 5, note: '' }] });
   renderEditor();
 });
-// Tap a Gantt block to inspect its note (toggle off if tapped again).
+// Gantt interactions: toggle a dish's checkbox, or tap a block to read its note.
 el.gantt.addEventListener('click', (e) => {
+  const check = e.target.closest('.dish-check');
+  if (check) { toggleDish(check.dataset.id); return; }
   const seg = e.target.closest('.gseg');
   if (!seg) return;
   const di = +seg.dataset.di, si = +seg.dataset.si;
