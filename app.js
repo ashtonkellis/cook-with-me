@@ -168,6 +168,12 @@ function startCooking() {
   if (offset <= 0) return;
   const serveAt = Date.now() + offset;
 
+  // Unlock audio and ask for notification permission from this user gesture.
+  primeAudio();
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {});
+  }
+
   // Warn if a dish takes longer than time-to-serve.
   const longest = Math.max(...state.dishes.map((d) => d.minutes), 0);
   if (longest * 60 * 1000 > offset) {
@@ -219,9 +225,43 @@ function tick() {
   renderSchedule();
 }
 
-// Placeholder alert — sound/vibration land in a later task.
+// ---- Alerts (sound + vibration) ----
+let audioCtx = null;
+
+// Some browsers require the AudioContext to be created/resumed from a user
+// gesture. We prime it when the user taps "Start cooking".
+function primeAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (_) { /* Web Audio unavailable; fall back to vibration only */ }
+}
+
+// A short two-note chime.
+function playChime() {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  [[880, 0], [1320, 0.18]].forEach(([freq, offset]) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const t = now + offset;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.3, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.4);
+  });
+}
+
 function notify(title, body) {
-  if ('vibrate' in navigator) navigator.vibrate(200);
+  if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+  playChime();
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try { new Notification(title, { body, icon: 'icons/icon-192.png', tag: 'cook-with-me' }); } catch (_) {}
+  }
   console.log(`[alert] ${title} — ${body}`);
 }
 
