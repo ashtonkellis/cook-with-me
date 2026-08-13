@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#c2410c" />
+  <meta name="description" content="A master timer that schedules every dish so your whole meal is ready at once." />
+  <title>Cook With Me</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>🍳 Cook With Me</h1>
+    <p class="tagline">Everything ready at the same time.</p>
+  </header>
+
+  <main>
+    <!-- Serve time -->
+    <section class="card" id="serve-card">
+      <h2>When should it all be ready?</h2>
+      <div class="serve-controls">
+        <label class="field">
+          <span>Ready in</span>
+          <div class="inline">
+            <input type="number" id="serve-mins" min="1" max="600" value="45" inputmode="numeric" />
+            <span>min</span>
+          </div>
+        </label>
+        <span class="or">or</span>
+        <label class="field">
+          <span>At clock time</span>
+          <input type="time" id="serve-clock" />
+        </label>
+      </div>
+    </section>
+
+    <!-- Add dish -->
+    <section class="card">
+      <h2>Add a dish</h2>
+      <form id="dish-form" class="dish-form">
+        <label class="field grow">
+          <span>Dish name</span>
+          <input type="text" id="dish-name" placeholder="Roast chicken" required />
+        </label>
+        <label class="field">
+          <span>Total time</span>
+          <div class="inline">
+            <input type="number" id="dish-mins" min="1" max="600" placeholder="90" inputmode="numeric" required />
+            <span>min</span>
+          </div>
+        </label>
+        <button type="submit" class="btn primary">Add</button>
+      </form>
+    </section>
+
+    <!-- Dishes list -->
+    <section class="card" id="dishes-card" hidden>
+      <h2>Dishes</h2>
+      <ul id="dishes-list" class="dishes-list"></ul>
+    </section>
+
+    <!-- Schedule / live timeline -->
+    <section class="card" id="schedule-card" hidden>
+      <div class="schedule-head">
+        <h2>Cook schedule</h2>
+        <button id="start-btn" class="btn primary">Start cooking</button>
+      </div>
+      <div id="countdown" class="countdown" hidden>
+        <div class="countdown-label">Serve in</div>
+        <div class="countdown-time" id="countdown-time">--:--</div>
+        <button id="stop-btn" class="btn ghost">Stop</button>
+      </div>
+      <ol id="timeline" class="timeline"></ol>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>Works offline · Add to Home Screen</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
