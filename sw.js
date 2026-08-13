@@ -1,12 +1,14 @@
 // Cook With Me — service worker
 // Cache-first for the app shell so it works fully offline.
 
-const CACHE = 'cook-with-me-v2';
+importScripts('version.js'); // provides self.APP_VERSION
+const CACHE = 'cook-with-me-v' + (self.APP_VERSION || '0');
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './version.js',
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.png',

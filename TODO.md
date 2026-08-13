@@ -10,6 +10,13 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 - [ ] Multiple saved meals (pick from a list)
 - [ ] Per-step "now" marker line on the timeline bar (finer than segment fill)
 
+## Recently added workflows (see CLAUDE.md)
+
+- Versioning: `version.js` is the single source; UI footer shows it; bump on
+  every deploy; tell the user which version to expect after deploying.
+- Deploy: push to `main` → auto-deploys to GitHub Pages (user authorized
+  pushing to main).
+
 ## In Progress
 
 - (nothing — core is done)
@@ -27,6 +34,8 @@ work — new requests go into **Todo**, finished work moves to **Done**.
   - [x] Step-start & meal-done alerts (chime + vibration + notification)
   - [x] Wall-clock persistence: timers survive close/reopen, no reset (verified)
 - [x] **In-app meal editor** — add/edit/remove dishes, steps, and per-dish emoji
+- [x] **Version indicator in the UI** + single-source versioning (`version.js`)
+- [x] **Project memory** (`CLAUDE.md`) capturing todo, versioning, deploy workflows
 
 - [x] Establish todo-list workflow (this file)
 - [x] Scaffold PWA: manifest, cache-first service worker, offline caching

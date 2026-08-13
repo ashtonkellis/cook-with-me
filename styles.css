@@ -135,6 +135,7 @@ main {
   background: none; border: none; color: var(--accent);
   font-size: 0.85rem; cursor: pointer; text-decoration: underline; padding: 4px;
 }
+.version { font-size: 0.72rem; color: var(--muted); opacity: 0.6; margin: 2px 0 0; font-variant-numeric: tabular-nums; }
 
 /* ---- Pills ---- */
 .pill {

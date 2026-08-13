@@ -11,6 +11,8 @@ page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 await page.goto('http://localhost:8123/', { waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
 
+const version = await page.textContent('#version');
+console.log('version shown:', version.trim());
 const heroTime = await page.textContent('.hero-time');
 console.log('hero time (expect 21:00):', heroTime.trim());
 const dishCount = await page.$$eval('.dish', (n) => n.length);
