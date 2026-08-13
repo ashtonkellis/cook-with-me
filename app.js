@@ -11,7 +11,7 @@ const EXAMPLE_MEAL = {
   name: 'BBQ cookout',
   dishes: [
     {
-      id: 'chicken', name: 'Chicken thighs', emoji: '🍗', included: false,
+      id: 'chicken', name: 'BBQ chicken thighs', emoji: '🍗', included: false,
       steps: [
         { label: 'Preheat BBQ', minutes: 5, note: 'Medium-high, ~450°F. Oil the grates.' },
         { label: 'Cook side 1', minutes: 8, note: 'Skin-side down. Don’t move them — let the skin crisp.' },
