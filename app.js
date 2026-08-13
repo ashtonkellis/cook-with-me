@@ -58,14 +58,44 @@ function resolveServeOffsetMs() {
   return mins * 60 * 1000;
 }
 
+// ---- Persistence ----
+const STORE_KEY = 'cook-with-me:plan';
+
+function savePlan() {
+  try {
+    const clock = el.serveClock.value;
+    const mins = el.serveMins.value;
+    localStorage.setItem(STORE_KEY, JSON.stringify({ dishes: state.dishes, serveClock: clock, serveMins: mins }));
+  } catch (_) { /* storage may be unavailable (private mode); ignore */ }
+}
+
+function loadPlan() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (Array.isArray(data.dishes)) {
+      state.dishes = data.dishes.filter((d) => d && d.name && d.minutes).map((d) => ({
+        id: d.id || uid(),
+        name: String(d.name),
+        minutes: Number(d.minutes),
+      }));
+    }
+    if (data.serveClock) el.serveClock.value = data.serveClock;
+    else if (data.serveMins) el.serveMins.value = data.serveMins;
+  } catch (_) { /* corrupt data; start fresh */ }
+}
+
 // ---- Dishes ----
 function addDish(name, minutes) {
   state.dishes.push({ id: uid(), name, minutes });
+  savePlan();
   render();
 }
 
 function removeDish(id) {
   state.dishes = state.dishes.filter((d) => d.id !== id);
+  savePlan();
   render();
 }
 
@@ -212,8 +242,8 @@ el.dishForm.addEventListener('submit', (e) => {
   el.dishName.focus();
 });
 
-el.serveMins.addEventListener('input', () => { el.serveClock.value = ''; renderSchedule(); });
-el.serveClock.addEventListener('input', renderSchedule);
+el.serveMins.addEventListener('input', () => { el.serveClock.value = ''; savePlan(); renderSchedule(); });
+el.serveClock.addEventListener('input', () => { savePlan(); renderSchedule(); });
 el.startBtn.addEventListener('click', startCooking);
 el.stopBtn.addEventListener('click', stopCooking);
 
@@ -224,4 +254,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+loadPlan();
 render();

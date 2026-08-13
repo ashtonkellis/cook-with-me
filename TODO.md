@@ -5,7 +5,6 @@ go into **Todo**; finished work moves to **Done**.
 
 ## Todo
 
-- [ ] Persist meal plans to localStorage so they survive reloads
 - [ ] Add a library of preset dishes with common step timings
 - [ ] Add sound + vibration alerts when a step fires
 - [ ] Set up GitHub Pages deployment
@@ -20,3 +19,4 @@ go into **Todo**; finished work moves to **Done**.
 - [x] Scaffold PWA: manifest, service worker, offline caching
 - [x] Core "master timer" UI: add dishes, steps, compute a synchronized cook schedule
 - [x] Add app icons (192px, 512px, maskable) generated from a pure-Python renderer
+- [x] Persist meal plans to localStorage so they survive reloads
