@@ -39,6 +39,8 @@ work — new requests go into **Todo**, finished work moves to **Done**.
       shown in the active dish card + hero next-step, editable in the editor
 - [x] **Custom app icon** — user-provided skillet/timer art, resized to
       192/512/maskable via `tools/resize_icon.py` (retired the placeholder SVG)
+- [x] **Palette matched to the icon** — royal navy bg, amber (#fca602) & leaf
+      green (#37c57b) accents, sampled directly from the icon art
 - [x] **Project memory** (`CLAUDE.md`) capturing todo, versioning, deploy workflows
 
 - [x] Establish todo-list workflow (this file)

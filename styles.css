@@ -1,20 +1,21 @@
 :root {
-  --bg-top: #0e2a44;
-  --bg-bot: #081726;
-  --card: #12304a;
-  --card-2: #0f2740;
-  --ink: #eaf2f9;
-  --muted: #93aec6;
-  --line: rgba(255, 255, 255, 0.08);
-  --track: rgba(255, 255, 255, 0.06);
+  /* Palette sampled from the app icon: royal navy, amber skillet, leaf green */
+  --bg-top: #04214a;   /* icon navy (top of gradient) */
+  --bg-bot: #01102b;   /* icon navy (bottom, darker) */
+  --card: #0d2c58;     /* royal navy card */
+  --card-2: #0a2247;
+  --ink: #eaf1fb;
+  --muted: #8ea6c8;
+  --line: rgba(255, 255, 255, 0.09);
+  --track: rgba(255, 255, 255, 0.07);
 
-  --waiting: #64748b;
-  --active: #f59e0b;   /* cooking amber */
-  --done: #34d399;     /* ready green */
-  --accent: #38bdf8;   /* cyan highlight */
+  --waiting: #6079a3;  /* muted royal-blue */
+  --active: #fca602;   /* icon amber (skillet) */
+  --done: #37c57b;     /* icon green (leaf) */
+  --accent: #fca602;   /* amber highlight, ties to the icon */
 
   --radius: 18px;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.25);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 12px 34px rgba(0, 0, 0, 0.32);
 }
 
 * { box-sizing: border-box; }
@@ -87,7 +88,7 @@ main {
 }
 
 /* ---- Hero ---- */
-.hero { background: linear-gradient(180deg, #163a59, #102c46); }
+.hero { background: linear-gradient(180deg, #0f3568, #0a2650); }
 .hero-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .hero-label { font-size: 0.8rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
 .hero-clock { font-size: 0.85rem; color: var(--muted); }
@@ -145,9 +146,9 @@ main {
   border-radius: 999px;
   white-space: nowrap;
 }
-.pill.waiting { color: #cbd5e1; background: rgba(100, 116, 139, 0.22); }
-.pill.active { color: #fcd34d; background: rgba(245, 158, 11, 0.18); }
-.pill.done { color: #6ee7b7; background: rgba(52, 211, 153, 0.18); }
+.pill.waiting { color: #cfdcf0; background: rgba(96, 121, 163, 0.28); }
+.pill.active { color: #ffca5f; background: rgba(252, 166, 2, 0.20); }
+.pill.done { color: #7fe0ac; background: rgba(55, 197, 123, 0.20); }
 
 /* ---- Dish card ---- */
 .dish-head { display: flex; align-items: center; gap: 12px; }
