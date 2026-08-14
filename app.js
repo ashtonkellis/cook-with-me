@@ -29,7 +29,7 @@ const EXAMPLE_MEAL = {
     {
       id: 'veggies', name: 'Stir-fried veggies', emoji: '🥦', included: false,
       steps: [
-        { label: 'Prep veggies', minutes: 6, note: 'Broccoli, peppers, snap peas — bite-size, uniform.' },
+        { label: 'Prep veggies', minutes: 6, ahead: true, note: 'Broccoli, peppers, snap peas — bite-size, uniform. Can do any time ahead.' },
         { label: 'Preheat pan', minutes: 3, note: 'Wok or skillet, high heat, 1 tbsp oil until shimmering.' },
         { label: 'Cook veggies', minutes: 10, note: 'Toss constantly. Add garlic + soy at the end.' },
       ],
@@ -87,7 +87,7 @@ const EXAMPLE_MEAL = {
     {
       id: 'test-veggies', name: 'Test veggies', emoji: '🥗', included: true,
       steps: [
-        { label: 'Prep', minutes: 0.05 },
+        { label: 'Prep', minutes: 0.05, ahead: true, note: 'Can prep ahead.' },
         { label: 'Preheat', minutes: 0.05 },
         { label: 'Cook', minutes: 0.08 },
       ],
@@ -244,25 +244,25 @@ function computeProgress() {
   for (let di = 0; di < schedule.dishes.length; di++) {
     const d = schedule.dishes[di];
     if (!d.included) { dishes.push({ ...d, di }); continue; }
-    let cursor = d.startMs;           // planned start of the dish's first step
+    let cursor = 0;                   // earliest a next step could begin (meal-elapsed)
     let pendingFound = false;
     const steps = d.steps.map((s, si) => {
       const key = stepKey(d.id, si);
       const finished = key in done;
       totalSteps++;
-      const projStart = cursor;
+      // "Prep ahead" steps can begin as soon as the previous one is done;
+      // gated steps wait for their staggered planned start (s.startMs) so the
+      // dish still finishes on time.
+      const projStart = s.ahead ? cursor : Math.max(cursor, s.startMs);
       let projEnd, state;
       if (finished) {
         projEnd = done[key];          // actual completion (meal-elapsed)
         state = 'done';
         doneCount++;
       } else {
-        projEnd = cursor + s.lenMs;    // projected by planned duration
+        projEnd = projStart + s.lenMs; // projected by planned duration
         if (!pendingFound) {
           pendingFound = true;
-          // First pending step of the dish: available once its start arrives
-          // (first step gated by the staggered plan; later steps unlock the
-          // moment the previous one is marked done).
           state = elapsed >= projStart - 1 ? 'active' : 'waiting';
           if (state === 'active') actions.push({ di, si, dish: d, step: { ...s, si, key, projStart, projEnd } });
         } else {
@@ -440,7 +440,7 @@ function renderHero(prog) {
       <div class="action">
         <span class="action-emoji">${escapeHtml(action.dish.emoji)}</span>
         <div class="action-text">
-          <strong>${escapeHtml(s.label)}</strong>
+          <strong>${escapeHtml(s.label)}${s.ahead ? ' <span class="ahead-tag">prep ahead</span>' : ''}</strong>
           <small>${escapeHtml(action.dish.name)}</small>
           ${s.note ? `<small class="ns-note">📝 ${escapeHtml(s.note)}</small>` : ''}
         </div>
@@ -457,18 +457,16 @@ function renderHero(prog) {
       const next = d.steps.find((st) => st.state === 'waiting');
       if (next && (!soonest || next.projStart < soonest.projStart)) soonest = { dish: d, step: next };
     }
-    const wait = soonest ? soonest.step.projStart - elapsed : 0;
+    const wait = soonest ? Math.max(0, soonest.step.projStart - elapsed) : 0;
     el.hero.innerHTML = `
       <div class="hero-top">
-        <span class="hero-label">${paused ? 'Paused' : 'Standing by'}</span>
+        <span class="hero-label">${paused ? 'Paused' : '⏳ Wait'}</span>
         <span class="hero-clock">${prog.doneCount}/${prog.totalSteps} done</span>
       </div>
-      <div class="hero-time small">${soonest ? fmtDur(Math.max(0, wait)) : '—'}</div>
-      ${soonest ? `<div class="next-step">
-        <span class="ns-emoji">${escapeHtml(soonest.dish.emoji)}</span>
-        <span class="ns-text"><strong>Up next: ${escapeHtml(soonest.step.label)}</strong><small>${escapeHtml(soonest.dish.name)}</small></span>
-        <span class="ns-count">${fmtDur(Math.max(0, wait))}</span>
-      </div>` : ''}
+      ${soonest ? `<div class="wait-line">
+        Next task is <b>${escapeHtml(soonest.step.label)}</b> <span class="wait-dish">(${escapeHtml(soonest.dish.name)})</span> starting in
+        <span class="wait-count">${fmtDur(wait)}</span>
+      </div>` : `<div class="wait-line">Nothing to do right now.</div>`}
       ${controls}`;
   }
 
@@ -520,7 +518,7 @@ function renderGantt(prog) {
       const isSel = selected && selected.di === di && selected.si === si;
       const wideEnough = width >= 9;
       const done = run.started && s.state === 'done';
-      const cls = `gseg${run.started ? ' ' + s.state : ''}${isSel ? ' sel' : ''}`;
+      const cls = `gseg${run.started ? ' ' + s.state : ''}${s.ahead ? ' ahead' : ''}${isSel ? ' sel' : ''}`;
       return `<div class="${cls}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${escapeHtml(s.label)} · ${fmtLen(s.lenMs)}${s.note ? ' — ' + escapeHtml(s.note) : ''}">${wideEnough ? `<span>${done ? '✓ ' : ''}${escapeHtml(s.label)}</span>` : ''}</div>`;
     }).join('');
 
@@ -624,6 +622,7 @@ function renderEditor() {
           <button class="ed-remove ed-remove-step" aria-label="Remove step">✕</button>
         </div>
         <input class="ed-step-note" value="${escapeHtml(s.note || '')}" placeholder="Note (optional) — e.g. Instant Pot: Manual, 3 min" />
+        <label class="ed-step-ahead"><input type="checkbox" class="ed-step-ahead-cb"${s.ahead ? ' checked' : ''} /> Can prep ahead (do any time before it's needed)</label>
       </div>`).join('');
     wrap.innerHTML = `
       <div class="ed-dish-top">
@@ -648,6 +647,7 @@ function syncDraftFromDom() {
       const mins = parseFloat(se.querySelector('.ed-step-min').value);
       draft.dishes[di].steps[si].minutes = mins > 0 ? mins : 1; // supports fractional (test) minutes
       draft.dishes[di].steps[si].note = se.querySelector('.ed-step-note').value.trim();
+      draft.dishes[di].steps[si].ahead = se.querySelector('.ed-step-ahead-cb').checked;
     });
   });
 }

@@ -149,6 +149,23 @@ main {
 .action-count.over { color: var(--done); font-size: 1.1rem; text-transform: uppercase; }
 .btn.big { width: 100%; padding: 15px; font-size: 1.1rem; margin-bottom: 10px; }
 
+.ahead-tag {
+  font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+  color: #05261a; background: var(--done); padding: 2px 6px; border-radius: 999px;
+  vertical-align: middle; margin-left: 6px;
+}
+
+/* Standing-by "Wait" message */
+.wait-line {
+  font-size: 1.05rem; line-height: 1.4; margin: 8px 0 12px; color: var(--ink);
+}
+.wait-line b { color: var(--active); }
+.wait-line .wait-dish { color: var(--muted); font-size: 0.9rem; }
+.wait-line .wait-count {
+  display: inline-block; font-weight: 800; font-variant-numeric: tabular-nums;
+  color: var(--active); font-size: 1.3rem; margin-left: 2px;
+}
+
 /* ---- Gantt chart ---- */
 .gantt-card {
   flex: 1 1 auto;
@@ -240,6 +257,7 @@ main {
 .gseg.done { filter: saturate(0.55) brightness(0.72); }
 .gseg.done span { opacity: 0.85; }
 .gseg.waiting { opacity: 0.82; }
+.gseg.ahead { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55); }
 
 /* Overlay across all track columns: consumed mask + now line */
 .gantt-now-layer {
@@ -416,6 +434,8 @@ main {
 .ed-step .ed-step-label { flex: 1; }
 .ed-step .ed-step-min { width: 74px; }
 .ed-step .ed-step-note { font-size: 0.85rem; opacity: 0.95; }
+.ed-step-ahead { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; color: var(--muted); cursor: pointer; }
+.ed-step-ahead input { width: auto; }
 .ed-remove { background: none; border: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; padding: 0 6px; }
 .ed-addstep { align-self: flex-start; margin-top: 4px; }
 

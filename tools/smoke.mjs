@@ -72,14 +72,29 @@ const progLabel1 = (await page.textContent('.hero-clock')).trim();
 console.log('action cards (expect 1):', actionCards, '| done-btn:', !!doneBtn, '| progress:', progLabel1);
 const actionTitle = await page.textContent('.action-text strong');
 console.log('current task:', actionTitle.trim());
+// A prep-ahead step (test veggies "Prep") is available immediately -> "+N ready".
+console.log('prep-ahead ready early:', progLabel1.includes('+') ? 'YES (' + progLabel1 + ')' : 'no');
 
 // Complete the current task -> progress advances, a done block appears.
 await page.click('#done-btn');
 await page.waitForTimeout(200);
 const progLabel2 = (await page.textContent('.hero-clock')).trim();
 const doneBlocks = await page.$$eval('.gseg.done', (n) => n.length);
-console.log('after tapping complete -> progress:', progLabel2, '| done blocks:', doneBlocks);
+const aheadTag = await page.$('.ahead-tag');
+console.log('after complete -> progress:', progLabel2, '| done blocks:', doneBlocks, '| next task shows prep-ahead tag:', !!aheadTag);
 await page.screenshot({ path: 'tools/shot-running.png' });
+
+// Wait state: finish chicken + veggies, leave rice's gated first step not yet due.
+await page.evaluate(() => {
+  const doneSteps = {};
+  for (const id of ['test-chicken', 'test-veggies']) for (let i = 0; i < 3; i++) doneSteps[`${id}:${i}`] = 200;
+  localStorage.setItem('cook-with-me:run', JSON.stringify({ started: true, runningSince: Date.now() - 1000, accumMs: 0, doneSteps }));
+});
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(200);
+const waitLine = await page.$eval('.wait-line', (n) => n.textContent).catch(() => '(none)');
+console.log('wait message:', waitLine.replace(/\s+/g, ' ').trim());
+await page.screenshot({ path: 'tools/shot-wait.png' });
 
 // Persistence across reload (completion + elapsed both survive).
 await page.reload({ waitUntil: 'networkidle' });
@@ -91,7 +106,8 @@ console.log('progress after reload (should keep completions):', progAfterReload)
 await page.click('#edit-btn');
 await page.waitForTimeout(200);
 const edDishes = await page.$$eval('.ed-dish', (n) => n.length);
-console.log('editor opens, dishes listed:', edDishes);
+const aheadToggles = await page.$$eval('.ed-step-ahead-cb', (n) => n.length);
+console.log('editor opens, dishes listed:', edDishes, '| prep-ahead toggles present:', aheadToggles > 0);
 await page.click('#editor-close');
 
 // Done state: mark every included step complete.

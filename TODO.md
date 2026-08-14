@@ -64,6 +64,11 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 - [x] **Startup dish picker modal** — selection moved to a "Choose dishes" modal
       that launches at startup; the idle Gantt now previews only chosen dishes
       (reopen via the hero button or when nothing's selected).
+- [x] **"Wait" standing-by message** — "Next task is ___ (dish) starting in ___".
+- [x] **Prep-ahead steps** — per-step `ahead` flag (editable). Ahead steps (e.g.
+      Prep veggies) become available immediately; gated steps still wait for
+      their scheduled start so the dish finishes on time. Shown with a "prep
+      ahead" tag on the action card and an outline on the Gantt block.
 - [x] **Project memory** (`CLAUDE.md`) capturing todo, versioning, deploy workflows
 
 - [x] Establish todo-list workflow (this file)
