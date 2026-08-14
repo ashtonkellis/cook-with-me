@@ -154,6 +154,51 @@ main {
 }
 .action-count.over { color: var(--done); font-size: 1.1rem; text-transform: uppercase; }
 .btn.big { width: 100%; padding: 15px; font-size: 1.1rem; margin-bottom: 10px; }
+.action-count.prep { color: var(--muted); font-size: 1rem; font-weight: 700; }
+
+/* Prep checklist (remaining prep tasks under the current one) */
+.prep-list {
+  list-style: none; margin: 0 0 10px; padding: 6px 0 0;
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 22vh; overflow-y: auto;
+  border-top: 1px solid var(--line);
+}
+.prep-list li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.04);
+}
+.pl-emoji { font-size: 1.1rem; flex: none; }
+.pl-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+.pl-text b { font-size: 0.9rem; }
+.pl-text small { color: var(--muted); font-size: 0.75rem; }
+.pl-done {
+  flex: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06);
+  color: var(--done); font-size: 1rem; font-weight: 900;
+}
+.pl-done:active { transform: scale(0.94); }
+.prep-empty { color: var(--muted); font-size: 0.95rem; margin: 8px 0 12px; }
+
+/* Timed action bar in the Gantt card */
+.timed-now {
+  flex: none;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px; margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+.timed-now.wait, .timed-now.alldone { color: var(--muted); display: block; }
+.timed-now.wait b { color: var(--ink); }
+.timed-now .tn-count { color: var(--active); font-weight: 800; font-variant-numeric: tabular-nums; }
+.tn-emoji { font-size: 1.3rem; flex: none; }
+.tn-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+.tn-text b { font-size: 0.98rem; }
+.tn-text small { color: var(--muted); font-size: 0.76rem; }
+.tn-count { font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--active); flex: none; }
+.tn-count.over { color: var(--done); font-size: 0.9rem; text-transform: uppercase; }
+.btn.tn-done { flex: none; padding: 8px 14px; font-size: 0.9rem; }
 
 .ahead-tag {
   font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;

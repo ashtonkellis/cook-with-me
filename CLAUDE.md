@@ -45,8 +45,10 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
   timestamp (`runningSince` + `accumMs`), persisted to localStorage, so closing/
   reopening never resets — the food really keeps cooking. Pause freezes elapsed.
 - **Dishes** = `{ id, name, emoji, included, steps: [...] }`. A step is
-  `{ label, minutes, note?, ahead?, shared? }`:
-  - `ahead` — can be done any time (not gated to its scheduled start).
+  `{ label, minutes, note?, prep?, shared? }`:
+  - `prep` — untimed do-any-time task (legacy `ahead` still honored). Prep tasks
+    are excluded from the timeline and shown as a to-do list + hero at the TOP;
+    timed steps are scheduled and shown in the Gantt at the BOTTOM.
   - `shared` — same-labeled shared steps across included dishes are one physical
     task, owned by the earliest dish; redundant copies are skipped/auto-done.
   - `included` picks which dishes are in the meal (chosen in the picker modal).

@@ -67,6 +67,11 @@ work — new requests go into **Todo**, finished work moves to **Done**.
       Prep veggies) become available immediately; gated steps still wait for
       their scheduled start so the dish finishes on time. Shown with a "prep
       ahead" tag on the action card and an outline on the Gantt block.
+- [x] **Prep vs timed tasks** — per-step `prep` flag (editable; replaces `ahead`).
+      Prep tasks are untimed do-any-time tasks shown as a to-do list + hero at the
+      top; timed tasks are scheduled and shown in the Gantt at the bottom with a
+      "current timed task" action bar. Prep tasks are excluded from the
+      finish-together timeline.
 - [x] **Shared steps** — per-step `shared` flag (editable). Same-labeled shared
       steps across dishes (e.g. "Preheat BBQ") become one task owned by the
       earliest dish; redundant copies are skipped as actions and shown as

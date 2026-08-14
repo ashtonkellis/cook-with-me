@@ -65,26 +65,28 @@ console.log('lanes while running (only included, expect 3):', runningLanes);
 const nowline = await page.$('.gantt-nowline');
 console.log('now-line present:', !!nowline);
 
-// Guided model: exactly one action card + a "Tap when complete" button.
-const actionCards = await page.$$eval('.action', (n) => n.length);
-const doneBtn = await page.$('#done-btn');
-const progLabel1 = (await page.textContent('.hero-clock')).trim();
-console.log('action cards (expect 1):', actionCards, '| done-btn:', !!doneBtn, '| progress:', progLabel1);
-const actionTitle = await page.textContent('.action-text strong');
-console.log('current task:', actionTitle.trim());
-// A prep-ahead step (test veggies "Prep") is available immediately -> "+N ready".
-console.log('prep-ahead ready early:', progLabel1.includes('+') ? 'YES (' + progLabel1 + ')' : 'no');
+// Top = PREP task hero (untimed). Bottom = TIMED action bar in the Gantt.
+const prepTask = await page.textContent('.action-text strong');
+const prepDoneBtn = await page.$('#done-btn');
+console.log('top prep task:', prepTask.trim(), '| prep done-btn:', !!prepDoneBtn);
+const timedBar = (await page.$eval('.timed-now', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim();
+const timedDoneBtn = await page.$('#timed-done');
+console.log('timed action bar:', timedBar, '| timed done-btn:', !!timedDoneBtn);
 
-// Complete the current task -> progress advances, a done block appears.
+// Complete the prep task -> prep list clears, top shows "prep done".
 await page.click('#done-btn');
-await page.waitForTimeout(200);
-const progLabel2 = (await page.textContent('.hero-clock')).trim();
+await page.waitForTimeout(150);
+const prepEmpty = await page.$('.prep-empty');
+console.log('after completing prep -> top shows prep-done:', !!prepEmpty, '| progress:', (await page.textContent('.hero-clock')).trim());
+
+// Complete a timed task -> a done block appears on the Gantt.
+await page.click('#timed-done');
+await page.waitForTimeout(150);
 const doneBlocks = await page.$$eval('.gseg.done', (n) => n.length);
-const aheadTag = await page.$('.ahead-tag');
-console.log('after complete -> progress:', progLabel2, '| done blocks:', doneBlocks, '| next task shows prep-ahead tag:', !!aheadTag);
+console.log('after completing a timed task -> done blocks:', doneBlocks);
 await page.screenshot({ path: 'tools/shot-running.png' });
 
-// Wait state: finish chicken + veggies, leave rice's gated first step not yet due.
+// Wait state: finish chicken + veggies, leave rice's gated first timed step not yet due.
 await page.evaluate(() => {
   const doneSteps = {};
   for (const id of ['test-chicken', 'test-veggies']) for (let i = 0; i < 3; i++) doneSteps[`${id}:${i}`] = 200;
@@ -92,8 +94,8 @@ await page.evaluate(() => {
 });
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(200);
-const waitLine = await page.$eval('.wait-line', (n) => n.textContent).catch(() => '(none)');
-console.log('wait message:', waitLine.replace(/\s+/g, ' ').trim());
+const waitLine = (await page.$eval('.timed-now.wait', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim();
+console.log('timed wait message:', waitLine);
 await page.screenshot({ path: 'tools/shot-wait.png' });
 
 // Persistence across reload (completion + elapsed both survive).
@@ -106,8 +108,8 @@ console.log('progress after reload (should keep completions):', progAfterReload)
 await page.click('#edit-btn');
 await page.waitForTimeout(200);
 const edDishes = await page.$$eval('.ed-dish', (n) => n.length);
-const aheadToggles = await page.$$eval('.ed-step-ahead-cb', (n) => n.length);
-console.log('editor opens, dishes listed:', edDishes, '| prep-ahead toggles present:', aheadToggles > 0);
+const prepToggles = await page.$$eval('.ed-step-prep-cb', (n) => n.length);
+console.log('editor opens, dishes listed:', edDishes, '| prep toggles present:', prepToggles > 0);
 await page.click('#editor-close');
 
 // Shared steps: two BBQ dishes that share "Preheat BBQ" -> one physical task.
@@ -120,9 +122,9 @@ await page.evaluate(() => {
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(200);
 const sharedBlocks = await page.$$eval('.gseg.shared, .gseg.shared-done', (n) => n.length);
-const curTask = (await page.textContent('.action-text strong')).replace(/\s+/g, ' ').trim();
-const sharedTag = await page.$('.shared-tag');
-console.log('shared: redundant blocks (expect 1):', sharedBlocks, '| current task:', curTask, '| shared tag on card:', !!sharedTag);
+const curTask = (await page.$eval('.timed-now b', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim();
+const sharedTag = await page.$('.timed-now .shared-tag');
+console.log('shared: redundant blocks (expect 1):', sharedBlocks, '| current timed task:', curTask, '| shared tag:', !!sharedTag);
 await page.screenshot({ path: 'tools/shot-shared.png' });
 // Reset the meal back to the default test selection for a clean state.
 await page.evaluate(() => {

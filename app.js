@@ -21,15 +21,15 @@ const EXAMPLE_MEAL = {
     {
       id: 'rice', name: 'Rice', emoji: '🍚', included: false,
       steps: [
+        { label: 'Measure & wash rice', minutes: 3, prep: true, note: '2 cups rice, rinse until water runs clear.' },
         { label: 'Set up Instant Pot', minutes: 3, note: 'Add rinsed rice + 1:1 water. Seal, valve to Sealing.' },
-        { label: 'Measure & wash rice', minutes: 3, note: '2 cups rice, rinse until water runs clear.' },
         { label: 'Cook rice', minutes: 10, note: 'Instant Pot: Manual / Pressure Cook, 3 min, then natural release.' },
       ],
     },
     {
       id: 'veggies', name: 'Stir-fried veggies', emoji: '🥦', included: false,
       steps: [
-        { label: 'Prep veggies', minutes: 6, ahead: true, note: 'Broccoli, peppers, snap peas — bite-size, uniform. Can do any time ahead.' },
+        { label: 'Prep veggies', minutes: 6, prep: true, note: 'Broccoli, peppers, snap peas — bite-size, uniform. Chop any time ahead.' },
         { label: 'Preheat pan', minutes: 3, note: 'Wok or skillet, high heat, 1 tbsp oil until shimmering.' },
         { label: 'Cook veggies', minutes: 10, note: 'Toss constantly. Add garlic + soy at the end.' },
       ],
@@ -87,7 +87,7 @@ const EXAMPLE_MEAL = {
     {
       id: 'test-veggies', name: 'Test veggies', emoji: '🥗', included: true,
       steps: [
-        { label: 'Prep', minutes: 0.05, ahead: true, note: 'Can prep ahead.' },
+        { label: 'Chop', minutes: 0.05, prep: true, note: 'Prep task — do any time.' },
         { label: 'Preheat', minutes: 0.05 },
         { label: 'Cook', minutes: 0.08 },
       ],
@@ -156,31 +156,37 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// A step is a "prep" task if flagged prep (legacy `ahead` also counts). Prep
+// tasks are untimed — they don't occupy the finish-together timeline.
+const isPrep = (st) => !!(st.prep || st.ahead);
+
 // ---------- Scheduling ----------
-// Included dishes each start at (mealDuration - dishDuration) so they all end
-// together. Excluded dishes are kept (for the idle picker) but not scheduled.
+// Only TIMED steps are scheduled: each included dish's timed steps run back-to-
+// back and end at mealMs, so all dishes finish together. Prep steps carry a
+// duration (for display) but no timeline position.
 function computeSchedule(m) {
   const dishes = m.dishes.map((d) => {
-    const dur = d.steps.reduce((s, st) => s + st.minutes, 0) * MIN;
-    return { ...d, included: d.included !== false, durationMs: dur };
+    const timedDur = d.steps.reduce((s, st) => s + (isPrep(st) ? 0 : st.minutes), 0) * MIN;
+    return { ...d, included: d.included !== false, durationMs: timedDur };
   });
   const included = dishes.filter((d) => d.included);
   const mealMs = Math.max(0, ...included.map((d) => d.durationMs));
   for (const d of dishes) {
     if (d.included) {
-      d.startMs = mealMs - d.durationMs;
+      d.startMs = mealMs - d.durationMs; // where this dish's timed steps begin
       let cursor = d.startMs;
       d.steps = d.steps.map((st) => {
-        const start = cursor;
         const len = st.minutes * MIN;
+        if (isPrep(st)) return { ...st, prep: true, lenMs: len, startMs: null, endMs: null };
+        const start = cursor;
         cursor += len;
-        return { ...st, lenMs: len, startMs: start, endMs: cursor };
+        return { ...st, prep: false, lenMs: len, startMs: start, endMs: cursor };
       });
-      d.endMs = mealMs; // every included dish finishes with the meal
+      d.endMs = mealMs;
     } else {
       d.startMs = null;
       d.endMs = null;
-      d.steps = d.steps.map((st) => ({ ...st, lenMs: st.minutes * MIN, startMs: null, endMs: null }));
+      d.steps = d.steps.map((st) => ({ ...st, prep: isPrep(st), lenMs: st.minutes * MIN, startMs: null, endMs: null }));
     }
   }
   return { dishes, mealMs, includedCount: included.length };
@@ -252,30 +258,41 @@ function sharedInfo() {
   return info;
 }
 
-// Live progression: projects each included dish's steps from actual completion
-// times so the remaining timeline shifts based on when tasks are marked done.
+// Live progression, split into two tracks:
+//   • prep  — untimed do-any-time tasks (top to-do list), pending in order
+//   • timed — scheduled steps projected onto the Gantt (bottom)
 function computeProgress() {
   const elapsed = elapsedMs();
   const done = run.doneSteps || {};
   const shared = sharedInfo();
   const dishes = [];
-  const actions = [];
+  const timedActions = [];
+  const prepPending = [];
   let timelineMs = schedule.mealMs;
-  let totalSteps = 0, doneCount = 0;
+  let timedTotal = 0, timedDone = 0, prepTotal = 0, prepDone = 0;
 
   for (let di = 0; di < schedule.dishes.length; di++) {
     const d = schedule.dishes[di];
     if (!d.included) { dishes.push({ ...d, di }); continue; }
-    let cursor = 0;                   // earliest a next step could begin (meal-elapsed)
-    let actionableFound = false;
+    let cursor = 0;
+    let timedActionFound = false;
     const steps = d.steps.map((s, si) => {
       const key = stepKey(d.id, si);
       const sh = shared[key];
-      const redundant = sh && !sh.isOwner;     // handled by another dish's copy
+      const redundant = sh && !sh.isOwner;
       const ownerDone = sh ? sh.ownerKey in done : false;
       const finished = key in done || (redundant && ownerDone);
-      if (!redundant) totalSteps++;            // redundant copies aren't tasks you do
-      const projStart = s.ahead ? cursor : Math.max(cursor, s.startMs);
+      const shareCount = sh ? sh.count : 0;
+
+      if (s.prep) {
+        if (!redundant) { prepTotal++; if (finished) prepDone++; }
+        const state = finished ? 'done' : (redundant ? (ownerDone ? 'shared-done' : 'shared') : 'pending');
+        if (!redundant && !finished) prepPending.push({ di, si, key, dish: d, step: { ...s, si, key, shareCount } });
+        return { ...s, si, key, state, redundant, shareCount };
+      }
+
+      // timed step — projected onto the shared meal timeline
+      const projStart = Math.max(cursor, s.startMs || 0);
       let projEnd, state;
       if (redundant) {
         projEnd = projStart + s.lenMs;
@@ -283,28 +300,33 @@ function computeProgress() {
       } else if (finished) {
         projEnd = done[key];
         state = 'done';
-        doneCount++;
+        timedTotal++; timedDone++;
       } else {
+        timedTotal++;
         projEnd = projStart + s.lenMs;
-        if (!actionableFound) {
-          actionableFound = true;
+        if (!timedActionFound) {
+          timedActionFound = true;
           state = elapsed >= projStart - 1 ? 'active' : 'waiting';
-          if (state === 'active') {
-            actions.push({ di, si, dish: d, step: { ...s, si, key, projStart, projEnd, shareCount: sh ? sh.count : 0 } });
-          }
+          if (state === 'active') timedActions.push({ di, si, dish: d, step: { ...s, si, key, projStart, projEnd, shareCount } });
         } else {
           state = 'waiting';
         }
       }
       cursor = projEnd;
-      return { ...s, si, key, projStart, projEnd, state, redundant, shareCount: sh ? sh.count : 0 };
+      return { ...s, si, key, projStart, projEnd, state, redundant, shareCount };
     });
     timelineMs = Math.max(timelineMs, cursor);
-    dishes.push({ ...d, di, steps, projEnd: cursor });
+    dishes.push({ ...d, di, steps });
   }
 
-  actions.sort((a, b) => a.step.projStart - b.step.projStart);
-  return { elapsed, dishes, actions, timelineMs, totalSteps, doneCount, allDone: doneCount === totalSteps && totalSteps > 0 };
+  timedActions.sort((a, b) => a.step.projStart - b.step.projStart);
+  const totalSteps = prepTotal + timedTotal;
+  const doneCount = prepDone + timedDone;
+  return {
+    elapsed, dishes, timedActions, prepPending, timelineMs,
+    prepTotal, prepDone, timedTotal, timedDone, totalSteps, doneCount,
+    allDone: totalSteps > 0 && doneCount === totalSteps,
+  };
 }
 
 function markDone(dishId, si) {
@@ -362,15 +384,18 @@ function stopTicking() {
 
 // Single update path: recompute progress, fire alerts for newly-available
 // tasks / completion, render, and stop the clock when everything's done.
+function progActionKeys(prog) {
+  return [...prog.timedActions.map((a) => a.step.key), ...prog.prepPending.map((p) => p.key)];
+}
 function refresh() {
   const prog = computeProgress();
 
   if (run.started && isRunning()) {
-    for (const a of prog.actions) {
+    for (const a of prog.timedActions) {
       if (!lastActiveKeys.has(a.step.key)) notify(`${a.dish.emoji} ${a.step.label}`, a.dish.name);
     }
   }
-  lastActiveKeys = new Set(prog.actions.map((a) => a.step.key));
+  lastActiveKeys = new Set(progActionKeys(prog));
 
   if (prog.allDone && !mealDoneNotified) {
     mealDoneNotified = true;
@@ -445,7 +470,7 @@ function renderHero(prog) {
     return;
   }
 
-  const elapsed = prog.elapsed;
+  // Top card = PREP tasks (untimed, do any time). Timed tasks live in the Gantt.
   const paused = !isRunning();
   const controls = `
     <div class="controls">
@@ -453,47 +478,43 @@ function renderHero(prog) {
       <button class="btn ghost" id="reset-btn">Reset</button>
     </div>`;
 
-  const action = prog.actions[0]; // one task at a time
-  if (action) {
-    const s = action.step;
-    const remain = s.projEnd - elapsed;               // guidance countdown
-    const overdue = remain <= 0;
-    const more = prog.actions.length - 1;
+  const prep = prog.prepPending;
+  if (prep.length) {
+    const cur = prep[0];
+    const s = cur.step;
+    const rest = prep.slice(1);
+    const restHtml = rest.map((p) => `
+      <li>
+        <span class="pl-emoji">${escapeHtml(p.dish.emoji)}</span>
+        <span class="pl-text"><b>${escapeHtml(p.step.label)}</b><small>${escapeHtml(p.dish.name)}</small></span>
+        <button class="pl-done" data-id="${escapeHtml(p.dish.id)}" data-si="${p.si}" aria-label="Complete ${escapeHtml(p.step.label)}">✓</button>
+      </li>`).join('');
     el.hero.innerHTML = `
       <div class="hero-top">
-        <span class="hero-label">Do this${paused ? ' · paused' : ''}</span>
-        <span class="hero-clock">${prog.doneCount}/${prog.totalSteps} done${more > 0 ? ` · +${more} ready` : ''}</span>
+        <span class="hero-label">🔪 Prep — do any time</span>
+        <span class="hero-clock">${prog.prepDone}/${prog.prepTotal} prep done</span>
       </div>
       <div class="action">
-        <span class="action-emoji">${escapeHtml(action.dish.emoji)}</span>
+        <span class="action-emoji">${escapeHtml(cur.dish.emoji)}</span>
         <div class="action-text">
-          <strong>${escapeHtml(s.label)}${s.ahead ? ' <span class="ahead-tag">prep ahead</span>' : ''}${s.shareCount > 1 ? ` <span class="ahead-tag shared-tag">shared ×${s.shareCount}</span>` : ''}</strong>
-          <small>${escapeHtml(action.dish.name)}</small>
+          <strong>${escapeHtml(s.label)}${s.shareCount > 1 ? ` <span class="ahead-tag shared-tag">shared ×${s.shareCount}</span>` : ''}</strong>
+          <small>${escapeHtml(cur.dish.name)}</small>
           ${s.note ? `<small class="ns-note">📝 ${escapeHtml(s.note)}</small>` : ''}
         </div>
-        <span class="action-count${overdue ? ' over' : ''}">${overdue ? 'go' : fmtDur(remain)}</span>
+        <span class="action-count prep">~${fmtLen(s.lenMs)}</span>
       </div>
       <button class="btn primary big" id="done-btn">✓ Tap when complete</button>
+      ${rest.length ? `<ul class="prep-list">${restHtml}</ul>` : ''}
       ${controls}`;
-    el.hero.querySelector('#done-btn').addEventListener('click', () => markDone(action.dish.id, s.si));
+    el.hero.querySelector('#done-btn').addEventListener('click', () => markDone(cur.dish.id, s.si));
   } else {
-    // Nothing available yet — waiting for the next dish's start time.
-    let soonest = null;
-    for (const d of prog.dishes) {
-      if (!d.included || !d.steps) continue;
-      const next = d.steps.find((st) => st.state === 'waiting');
-      if (next && (!soonest || next.projStart < soonest.projStart)) soonest = { dish: d, step: next };
-    }
-    const wait = soonest ? Math.max(0, soonest.step.projStart - elapsed) : 0;
+    // No prep pending — top card is slim; follow the timeline below.
     el.hero.innerHTML = `
       <div class="hero-top">
-        <span class="hero-label">${paused ? 'Paused' : '⏳ Wait'}</span>
+        <span class="hero-label">${paused ? 'Paused' : (prog.prepTotal ? '✓ Prep done' : 'Cooking')}</span>
         <span class="hero-clock">${prog.doneCount}/${prog.totalSteps} done</span>
       </div>
-      ${soonest ? `<div class="wait-line">
-        Next task is <b>${escapeHtml(soonest.step.label)}</b> <span class="wait-dish">(${escapeHtml(soonest.dish.name)})</span> starting in
-        <span class="wait-count">${fmtDur(wait)}</span>
-      </div>` : `<div class="wait-line">Nothing to do right now.</div>`}
+      <div class="prep-empty">${prog.prepTotal ? '✓ All prep done' : 'No prep tasks'} — follow the timeline below ↓</div>
       ${controls}`;
   }
 
@@ -526,27 +547,32 @@ function renderGantt(prog) {
     const hue = dishHue(di);
     const excluded = false;
 
-    // Per-dish status shown in the label gutter.
+    const timedSteps = d.steps.filter((s) => !s.prep);
+
+    // Per-dish status shown in the label gutter (timed steps only).
     let status, statusCls;
     if (!run.started) {
-      status = fmtLen(d.durationMs); statusCls = excluded ? 'off' : '';
+      status = fmtLen(d.durationMs); statusCls = '';
+    } else if (!timedSteps.length) {
+      status = 'prep only'; statusCls = '';
     } else {
-      const active = d.steps.find((s) => s.state === 'active');
-      const waiting = d.steps.find((s) => s.state === 'waiting');
-      if (d.steps.every((s) => s.state === 'done' || s.state === 'shared-done')) { status = '✓ done'; statusCls = 'done'; }
+      const active = timedSteps.find((s) => s.state === 'active');
+      const waiting = timedSteps.find((s) => s.state === 'waiting');
+      if (timedSteps.every((s) => s.state === 'done' || s.state === 'shared-done')) { status = '✓ done'; statusCls = 'done'; }
       else if (active) { const r = active.projEnd - elapsed; status = r <= 0 ? 'go now' : `${fmtDur(r)} left`; statusCls = 'cook'; }
       else if (waiting) { status = `in ${fmtDur(Math.max(0, waiting.projStart - elapsed))}`; statusCls = 'wait'; }
       else { status = ''; statusCls = ''; }
     }
 
-    // Excluded dishes have no timeline position — show no blocks.
-    const segs = excluded ? '' : d.steps.map((s, si) => {
+    // Only TIMED steps get blocks on the timeline; prep steps live up top.
+    const segs = d.steps.map((s, si) => {
+      if (s.prep) return '';
       const left = pct(s.projStart), width = Math.max(0.8, pct(s.projEnd) - pct(s.projStart));
       const isSel = selected && selected.di === di && selected.si === si;
       const wideEnough = width >= 9;
       const done = run.started && s.state === 'done';
       const isShared = run.started && (s.state === 'shared' || s.state === 'shared-done');
-      const cls = `gseg${run.started ? ' ' + s.state : ''}${s.ahead ? ' ahead' : ''}${isSel ? ' sel' : ''}`;
+      const cls = `gseg${run.started ? ' ' + s.state : ''}${isSel ? ' sel' : ''}`;
       const prefix = done ? '✓ ' : (s.state === 'shared-done' ? '✓ ' : (s.state === 'shared' ? '↔ ' : ''));
       const label = isShared ? `${prefix}shared` : `${prefix}${escapeHtml(s.label)}`;
       const tip = isShared ? `${escapeHtml(s.label)} — shared, done once by another dish` : `${escapeHtml(s.label)} · ${fmtLen(s.lenMs)}${s.note ? ' — ' + escapeHtml(s.note) : ''}`;
@@ -580,12 +606,40 @@ function renderGantt(prog) {
     }
   }
 
+  // Timed action bar: the current timed task (with Done), or a wait message.
+  let bar = '';
+  if (run.started && !prog.allDone) {
+    const ta = prog.timedActions[0];
+    if (ta) {
+      const s = ta.step;
+      const remain = s.projEnd - elapsed;
+      const over = remain <= 0;
+      bar = `<div class="timed-now go">
+        <span class="tn-emoji">${escapeHtml(ta.dish.emoji)}</span>
+        <span class="tn-text"><b>${escapeHtml(s.label)}${s.shareCount > 1 ? ` <span class="ahead-tag shared-tag">shared ×${s.shareCount}</span>` : ''}</b><small>${escapeHtml(ta.dish.name)}</small></span>
+        <span class="tn-count${over ? ' over' : ''}">${over ? 'go' : fmtDur(remain)}</span>
+        <button class="btn primary tn-done" id="timed-done" data-id="${escapeHtml(ta.dish.id)}" data-si="${s.si}">✓ Done</button>
+      </div>`;
+    } else {
+      let soonest = null;
+      for (const d of prog.dishes) {
+        if (!d.included || !d.steps) continue;
+        const nx = d.steps.find((st) => !st.prep && st.state === 'waiting');
+        if (nx && (!soonest || nx.projStart < soonest.step.projStart)) soonest = { dish: d, step: nx };
+      }
+      bar = soonest
+        ? `<div class="timed-now wait">⏳ Next timed task is <b>${escapeHtml(soonest.step.label)}</b> (${escapeHtml(soonest.dish.name)}) in <span class="tn-count">${fmtDur(Math.max(0, soonest.step.projStart - elapsed))}</span></div>`
+        : `<div class="timed-now alldone">✓ All timed tasks done</div>`;
+    }
+  }
+
   const total = fmtDur(scaleMs);
   el.gantt.innerHTML = `
     <div class="gantt-head">
       <span class="gantt-title">Meal timeline</span>
       ${detail}
     </div>
+    ${bar}
     <div class="gantt-rows">
       ${rows || `<div class="gantt-empty">No dishes chosen yet.<br><button class="btn ghost" id="gantt-choose">🍽️ Choose dishes</button></div>`}
       ${nowLayer}
@@ -653,7 +707,7 @@ function renderEditor() {
           <button class="ed-remove ed-remove-step" aria-label="Remove step">✕</button>
         </div>
         <input class="ed-step-note" value="${escapeHtml(s.note || '')}" placeholder="Note (optional) — e.g. Instant Pot: Manual, 3 min" />
-        <label class="ed-step-ahead"><input type="checkbox" class="ed-step-ahead-cb"${s.ahead ? ' checked' : ''} /> Can prep ahead (do any time before it's needed)</label>
+        <label class="ed-step-ahead"><input type="checkbox" class="ed-step-prep-cb"${(s.prep || s.ahead) ? ' checked' : ''} /> Prep task (untimed — do any time, shown in the prep list)</label>
         <label class="ed-step-ahead"><input type="checkbox" class="ed-step-shared-cb"${s.shared ? ' checked' : ''} /> Shared step — same-labeled steps are done once (e.g. Preheat BBQ)</label>
       </div>`).join('');
     wrap.innerHTML = `
@@ -679,7 +733,8 @@ function syncDraftFromDom() {
       const mins = parseFloat(se.querySelector('.ed-step-min').value);
       draft.dishes[di].steps[si].minutes = mins > 0 ? mins : 1; // supports fractional (test) minutes
       draft.dishes[di].steps[si].note = se.querySelector('.ed-step-note').value.trim();
-      draft.dishes[di].steps[si].ahead = se.querySelector('.ed-step-ahead-cb').checked;
+      draft.dishes[di].steps[si].prep = se.querySelector('.ed-step-prep-cb').checked;
+      delete draft.dishes[di].steps[si].ahead; // migrated to `prep`
       draft.dishes[di].steps[si].shared = se.querySelector('.ed-step-shared-cb').checked;
     });
   });
@@ -721,8 +776,14 @@ el.addDish.addEventListener('click', () => {
   draft.dishes.push({ id: uid(), name: 'New dish', emoji: '🍽️', steps: [{ label: 'Step', minutes: 5, note: '' }] });
   renderEditor();
 });
-// Gantt interactions: open the picker, or tap a block to read its note.
+// Prep checklist: tap a row's ✓ to complete it. Also the timed-task Done button.
+el.hero.addEventListener('click', (e) => {
+  const pl = e.target.closest('.pl-done');
+  if (pl) { markDone(pl.dataset.id, +pl.dataset.si); return; }
+});
 el.gantt.addEventListener('click', (e) => {
+  const td = e.target.closest('#timed-done');
+  if (td) { markDone(td.dataset.id, +td.dataset.si); return; }
   if (e.target.closest('#gantt-choose')) { openPicker(); return; }
   const seg = e.target.closest('.gseg');
   if (!seg) return;
@@ -784,7 +845,7 @@ function init() {
   // Prime alert state from the current progress so reopening a running meal
   // doesn't re-chime every already-available task.
   const prog0 = computeProgress();
-  lastActiveKeys = new Set(prog0.actions.map((a) => a.step.key));
+  lastActiveKeys = new Set(progActionKeys(prog0));
   mealDoneNotified = prog0.allDone;
   if (isRunning() && !prog0.allDone) startTicking();
   refresh();
