@@ -284,6 +284,11 @@ main {
 .gantt-label .gs.cook { color: var(--active); font-weight: 700; }
 .gantt-label .gs.done { color: var(--done); font-weight: 700; }
 .gantt-label .gs.off { color: var(--muted); opacity: 0.8; }
+.lane-prep { font-size: 0.62rem; font-weight: 700; color: var(--muted); letter-spacing: 0.01em; }
+.lane-prep.done { color: var(--done); }
+.lane-prep.pending { color: var(--active); }
+.gantt-label .ge.prep-ready { box-shadow: 0 0 0 2px var(--done); border-color: transparent; }
+.gantt-label .ge.prep-pending { box-shadow: 0 0 0 2px var(--active); border-color: transparent; }
 
 .gantt-track {
   position: relative;

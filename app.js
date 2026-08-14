@@ -320,6 +320,9 @@ function computeProgress() {
   }
 
   timedActions.sort((a, b) => a.step.projStart - b.step.projStart);
+  // Prep tasks are ordered by when their dish's timed cooking begins — so the
+  // prep for the dish that starts cooking first is first in the list.
+  prepPending.sort((a, b) => (a.dish.startMs - b.dish.startMs) || (a.di - b.di) || (a.si - b.si));
   const totalSteps = prepTotal + timedTotal;
   const doneCount = prepDone + timedDone;
   return {
@@ -549,6 +552,18 @@ function renderGantt(prog) {
 
     const timedSteps = d.steps.filter((s) => !s.prep);
 
+    // Per-dish prep status badge (prep tasks live up top; show here whether this
+    // dish's prep is all done).
+    const prepSteps = d.steps.filter((s) => s.prep && !s.redundant);
+    const prepDoneN = prepSteps.filter((s) => s.state === 'done' || s.state === 'shared-done').length;
+    const prepAllDone = prepSteps.length > 0 && prepDoneN === prepSteps.length;
+    let prepBadge = '';
+    if (prepSteps.length) {
+      if (!run.started) prepBadge = `<span class="lane-prep">🔪 ${prepSteps.length} prep</span>`;
+      else if (prepAllDone) prepBadge = `<span class="lane-prep done">✓ prep ready</span>`;
+      else prepBadge = `<span class="lane-prep pending">🔪 ${prepSteps.length - prepDoneN} prep left</span>`;
+    }
+
     // Per-dish status shown in the label gutter (timed steps only).
     let status, statusCls;
     if (!run.started) {
@@ -579,11 +594,12 @@ function renderGantt(prog) {
       return `<div class="${cls}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${tip}">${wideEnough ? `<span>${label}</span>` : ''}</div>`;
     }).join('');
 
+    const geCls = `ge${run.started && prepSteps.length ? (prepAllDone ? ' prep-ready' : ' prep-pending') : ''}`;
     return `
       <div class="gantt-row">
         <div class="gantt-label">
-          <span class="ge">${escapeHtml(d.emoji)}</span>
-          <span class="gtxt"><span class="gn">${escapeHtml(d.name)}</span><span class="gs ${statusCls}">${status}</span></span>
+          <span class="${geCls}">${escapeHtml(d.emoji)}</span>
+          <span class="gtxt"><span class="gn">${escapeHtml(d.name)}</span><span class="gs ${statusCls}">${status}</span>${prepBadge}</span>
         </div>
         <div class="gantt-track" style="--hue:${hue}">${segs}</div>
       </div>`;

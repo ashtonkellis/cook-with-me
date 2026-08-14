@@ -72,12 +72,16 @@ console.log('top prep task:', prepTask.trim(), '| prep done-btn:', !!prepDoneBtn
 const timedBar = (await page.$eval('.timed-now', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim();
 const timedDoneBtn = await page.$('#timed-done');
 console.log('timed action bar:', timedBar, '| timed done-btn:', !!timedDoneBtn);
+// Dish lane shows its prep status (test veggies has a prep task -> pending badge).
+const prepPending = await page.$$eval('.lane-prep.pending', (n) => n.length);
+console.log('lanes showing prep-pending badge (expect 1 = veggies):', prepPending);
 
 // Complete the prep task -> prep list clears, top shows "prep done".
 await page.click('#done-btn');
 await page.waitForTimeout(150);
 const prepEmpty = await page.$('.prep-empty');
-console.log('after completing prep -> top shows prep-done:', !!prepEmpty, '| progress:', (await page.textContent('.hero-clock')).trim());
+const prepReady = await page.$$eval('.lane-prep.done', (n) => n.length);
+console.log('after completing prep -> top shows prep-done:', !!prepEmpty, '| lanes prep-ready:', prepReady, '| progress:', (await page.textContent('.hero-clock')).trim());
 
 // Complete a timed task -> a done block appears on the Gantt.
 await page.click('#timed-done');

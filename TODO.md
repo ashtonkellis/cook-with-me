@@ -67,6 +67,10 @@ work — new requests go into **Todo**, finished work moves to **Done**.
       Prep veggies) become available immediately; gated steps still wait for
       their scheduled start so the dish finishes on time. Shown with a "prep
       ahead" tag on the action card and an outline on the Gantt block.
+- [x] **Prep ordering + per-dish prep status** — prep tasks are ordered by when
+      their dish's timed cooking begins (earliest-cooking dish's prep first). Each
+      Gantt lane shows its prep status: amber ring + "N prep left" while pending,
+      green ring + "✓ prep ready" once that dish's prep is done.
 - [x] **Prep vs timed tasks** — per-step `prep` flag (editable; replaces `ahead`).
       Prep tasks are untimed do-any-time tasks shown as a to-do list + hero at the
       top; timed tasks are scheduled and shown in the Gantt at the bottom with a
