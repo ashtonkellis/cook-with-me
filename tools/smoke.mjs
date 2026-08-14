@@ -110,6 +110,27 @@ const aheadToggles = await page.$$eval('.ed-step-ahead-cb', (n) => n.length);
 console.log('editor opens, dishes listed:', edDishes, '| prep-ahead toggles present:', aheadToggles > 0);
 await page.click('#editor-close');
 
+// Shared steps: two BBQ dishes that share "Preheat BBQ" -> one physical task.
+await page.evaluate(() => {
+  const m = JSON.parse(localStorage.getItem('cook-with-me:meal'));
+  for (const d of m.dishes) d.included = (d.id === 'chicken' || d.id === 'steak');
+  localStorage.setItem('cook-with-me:meal', JSON.stringify(m));
+  localStorage.setItem('cook-with-me:run', JSON.stringify({ started: true, runningSince: Date.now(), accumMs: 0, doneSteps: {} }));
+});
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(200);
+const sharedBlocks = await page.$$eval('.gseg.shared, .gseg.shared-done', (n) => n.length);
+const curTask = (await page.textContent('.action-text strong')).replace(/\s+/g, ' ').trim();
+const sharedTag = await page.$('.shared-tag');
+console.log('shared: redundant blocks (expect 1):', sharedBlocks, '| current task:', curTask, '| shared tag on card:', !!sharedTag);
+await page.screenshot({ path: 'tools/shot-shared.png' });
+// Reset the meal back to the default test selection for a clean state.
+await page.evaluate(() => {
+  const m = JSON.parse(localStorage.getItem('cook-with-me:meal'));
+  for (const d of m.dishes) d.included = ['test-chicken', 'test-rice', 'test-veggies'].includes(d.id);
+  localStorage.setItem('cook-with-me:meal', JSON.stringify(m));
+});
+
 // Done state: mark every included step complete.
 await page.evaluate(() => {
   const doneSteps = {};

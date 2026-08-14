@@ -44,8 +44,17 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
 - **Timers are wall-clock based**: run state is derived from an absolute
   timestamp (`runningSince` + `accumMs`), persisted to localStorage, so closing/
   reopening never resets — the food really keeps cooking. Pause freezes elapsed.
-- **Dishes** = `{ id, name, emoji, steps: [{ label, minutes }] }`. Emoji is the
-  per-dish "image". The example 3-dish BBQ meal is seeded on first load.
+- **Dishes** = `{ id, name, emoji, included, steps: [...] }`. A step is
+  `{ label, minutes, note?, ahead?, shared? }`:
+  - `ahead` — can be done any time (not gated to its scheduled start).
+  - `shared` — same-labeled shared steps across included dishes are one physical
+    task, owned by the earliest dish; redundant copies are skipped/auto-done.
+  - `included` picks which dishes are in the meal (chosen in the picker modal).
+  Emoji is the per-dish "image". A dish library (BBQ dishes + fast test dishes)
+  is seeded; the 3 test dishes are selected by default.
+- **Guided model**: `computeProgress()` projects step times/states from actual
+  completions (`run.doneSteps`), yielding the one-at-a-time action queue and the
+  live Gantt. Completion is fully manual ("Tap when complete").
 - Files: `index.html`, `styles.css`, `app.js`, `version.js`, `sw.js`,
   `manifest.webmanifest`, `icons/`.
 - **Icons**: `icons/icon-source.png` is the master art. Regenerate the app

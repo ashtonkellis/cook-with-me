@@ -6,8 +6,6 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Todo
 
-- [ ] **Shared steps** — steps like "Preheat BBQ" shouldn't be repeated across
-      dishes; show in the UI that it's already done by an earlier dish's step
 - [ ] Reorder dishes / steps in the editor
 - [ ] Multiple saved meals (pick from a list)
 
@@ -69,6 +67,11 @@ work — new requests go into **Todo**, finished work moves to **Done**.
       Prep veggies) become available immediately; gated steps still wait for
       their scheduled start so the dish finishes on time. Shown with a "prep
       ahead" tag on the action card and an outline on the Gantt block.
+- [x] **Shared steps** — per-step `shared` flag (editable). Same-labeled shared
+      steps across dishes (e.g. "Preheat BBQ") become one task owned by the
+      earliest dish; redundant copies are skipped as actions and shown as
+      "↔ shared / ✓ shared" hatched blocks in the Gantt. Seeded on the BBQ
+      dishes' "Preheat BBQ".
 - [x] **Project memory** (`CLAUDE.md`) capturing todo, versioning, deploy workflows
 
 - [x] Establish todo-list workflow (this file)

@@ -13,7 +13,7 @@ const EXAMPLE_MEAL = {
     {
       id: 'chicken', name: 'BBQ chicken thighs', emoji: '🍗', included: false,
       steps: [
-        { label: 'Preheat BBQ', minutes: 5, note: 'Medium-high, ~450°F. Oil the grates.' },
+        { label: 'Preheat BBQ', minutes: 5, shared: true, note: 'Medium-high, ~450°F. Oil the grates.' },
         { label: 'Cook side 1', minutes: 8, note: 'Skin-side down. Don’t move them — let the skin crisp.' },
         { label: 'Cook side 2', minutes: 8, note: 'Flip once. Pull at 175°F internal.' },
       ],
@@ -37,7 +37,7 @@ const EXAMPLE_MEAL = {
     {
       id: 'steak', name: 'BBQ steak', emoji: '🥩', included: false,
       steps: [
-        { label: 'Preheat BBQ', minutes: 5, note: 'High heat for a good sear.' },
+        { label: 'Preheat BBQ', minutes: 5, shared: true, note: 'High heat for a good sear.' },
         { label: 'Cook side 1', minutes: 8 },
         { label: 'Cook side 2', minutes: 8 },
         { label: 'Rest', minutes: 5, note: 'Tent with foil — let the juices settle.' },
@@ -46,7 +46,7 @@ const EXAMPLE_MEAL = {
     {
       id: 'chicken-breast', name: 'BBQ chicken breast', emoji: '🐔', included: false,
       steps: [
-        { label: 'Preheat BBQ', minutes: 5 },
+        { label: 'Preheat BBQ', minutes: 5, shared: true },
         { label: 'Cook side 1', minutes: 15 },
         { label: 'Cook side 2', minutes: 15, note: 'Pull at 165°F internal.' },
       ],
@@ -54,7 +54,7 @@ const EXAMPLE_MEAL = {
     {
       id: 'corn', name: 'BBQ corn', emoji: '🌽', included: false,
       steps: [
-        { label: 'Preheat BBQ', minutes: 5 },
+        { label: 'Preheat BBQ', minutes: 5, shared: true },
         { label: 'Side 1', minutes: 5 },
         { label: 'Side 2', minutes: 5 },
         { label: 'Side 3', minutes: 5 },
@@ -229,13 +229,35 @@ function isAllDone() {
     .every((d) => d.steps.every((_, si) => isStepDone(d.id, si)));
 }
 
+// Shared steps: steps flagged `shared` with the same label across included
+// dishes are one physical task. The dish that needs it earliest "owns" it (you
+// do it there); the other copies are redundant and auto-satisfied when the
+// owner is done. Returns a map: stepKey -> { groupKey, isOwner, ownerKey, count }.
+function sharedInfo() {
+  const groups = {};
+  for (const d of schedule.dishes) {
+    if (!d.included) continue;
+    d.steps.forEach((s, si) => {
+      if (!s.shared) return;
+      const gk = s.label.trim().toLowerCase();
+      (groups[gk] || (groups[gk] = [])).push({ key: stepKey(d.id, si), start: s.startMs });
+    });
+  }
+  const info = {};
+  for (const gk in groups) {
+    const arr = groups[gk].slice().sort((a, b) => a.start - b.start);
+    const owner = arr[0];
+    for (const e of arr) info[e.key] = { groupKey: gk, isOwner: e.key === owner.key, ownerKey: owner.key, count: arr.length };
+  }
+  return info;
+}
+
 // Live progression: projects each included dish's steps from actual completion
 // times so the remaining timeline shifts based on when tasks are marked done.
-// Returns per-dish projected step times/states, the available "action" queue,
-// and the projected timeline length.
 function computeProgress() {
   const elapsed = elapsedMs();
   const done = run.doneSteps || {};
+  const shared = sharedInfo();
   const dishes = [];
   const actions = [];
   let timelineMs = schedule.mealMs;
@@ -245,32 +267,37 @@ function computeProgress() {
     const d = schedule.dishes[di];
     if (!d.included) { dishes.push({ ...d, di }); continue; }
     let cursor = 0;                   // earliest a next step could begin (meal-elapsed)
-    let pendingFound = false;
+    let actionableFound = false;
     const steps = d.steps.map((s, si) => {
       const key = stepKey(d.id, si);
-      const finished = key in done;
-      totalSteps++;
-      // "Prep ahead" steps can begin as soon as the previous one is done;
-      // gated steps wait for their staggered planned start (s.startMs) so the
-      // dish still finishes on time.
+      const sh = shared[key];
+      const redundant = sh && !sh.isOwner;     // handled by another dish's copy
+      const ownerDone = sh ? sh.ownerKey in done : false;
+      const finished = key in done || (redundant && ownerDone);
+      if (!redundant) totalSteps++;            // redundant copies aren't tasks you do
       const projStart = s.ahead ? cursor : Math.max(cursor, s.startMs);
       let projEnd, state;
-      if (finished) {
-        projEnd = done[key];          // actual completion (meal-elapsed)
+      if (redundant) {
+        projEnd = projStart + s.lenMs;
+        state = ownerDone ? 'shared-done' : 'shared';
+      } else if (finished) {
+        projEnd = done[key];
         state = 'done';
         doneCount++;
       } else {
-        projEnd = projStart + s.lenMs; // projected by planned duration
-        if (!pendingFound) {
-          pendingFound = true;
+        projEnd = projStart + s.lenMs;
+        if (!actionableFound) {
+          actionableFound = true;
           state = elapsed >= projStart - 1 ? 'active' : 'waiting';
-          if (state === 'active') actions.push({ di, si, dish: d, step: { ...s, si, key, projStart, projEnd } });
+          if (state === 'active') {
+            actions.push({ di, si, dish: d, step: { ...s, si, key, projStart, projEnd, shareCount: sh ? sh.count : 0 } });
+          }
         } else {
           state = 'waiting';
         }
       }
       cursor = projEnd;
-      return { ...s, si, key, projStart, projEnd, state };
+      return { ...s, si, key, projStart, projEnd, state, redundant, shareCount: sh ? sh.count : 0 };
     });
     timelineMs = Math.max(timelineMs, cursor);
     dishes.push({ ...d, di, steps, projEnd: cursor });
@@ -440,7 +467,7 @@ function renderHero(prog) {
       <div class="action">
         <span class="action-emoji">${escapeHtml(action.dish.emoji)}</span>
         <div class="action-text">
-          <strong>${escapeHtml(s.label)}${s.ahead ? ' <span class="ahead-tag">prep ahead</span>' : ''}</strong>
+          <strong>${escapeHtml(s.label)}${s.ahead ? ' <span class="ahead-tag">prep ahead</span>' : ''}${s.shareCount > 1 ? ` <span class="ahead-tag shared-tag">shared ×${s.shareCount}</span>` : ''}</strong>
           <small>${escapeHtml(action.dish.name)}</small>
           ${s.note ? `<small class="ns-note">📝 ${escapeHtml(s.note)}</small>` : ''}
         </div>
@@ -506,7 +533,7 @@ function renderGantt(prog) {
     } else {
       const active = d.steps.find((s) => s.state === 'active');
       const waiting = d.steps.find((s) => s.state === 'waiting');
-      if (d.steps.every((s) => s.state === 'done')) { status = '✓ done'; statusCls = 'done'; }
+      if (d.steps.every((s) => s.state === 'done' || s.state === 'shared-done')) { status = '✓ done'; statusCls = 'done'; }
       else if (active) { const r = active.projEnd - elapsed; status = r <= 0 ? 'go now' : `${fmtDur(r)} left`; statusCls = 'cook'; }
       else if (waiting) { status = `in ${fmtDur(Math.max(0, waiting.projStart - elapsed))}`; statusCls = 'wait'; }
       else { status = ''; statusCls = ''; }
@@ -518,8 +545,12 @@ function renderGantt(prog) {
       const isSel = selected && selected.di === di && selected.si === si;
       const wideEnough = width >= 9;
       const done = run.started && s.state === 'done';
+      const isShared = run.started && (s.state === 'shared' || s.state === 'shared-done');
       const cls = `gseg${run.started ? ' ' + s.state : ''}${s.ahead ? ' ahead' : ''}${isSel ? ' sel' : ''}`;
-      return `<div class="${cls}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${escapeHtml(s.label)} · ${fmtLen(s.lenMs)}${s.note ? ' — ' + escapeHtml(s.note) : ''}">${wideEnough ? `<span>${done ? '✓ ' : ''}${escapeHtml(s.label)}</span>` : ''}</div>`;
+      const prefix = done ? '✓ ' : (s.state === 'shared-done' ? '✓ ' : (s.state === 'shared' ? '↔ ' : ''));
+      const label = isShared ? `${prefix}shared` : `${prefix}${escapeHtml(s.label)}`;
+      const tip = isShared ? `${escapeHtml(s.label)} — shared, done once by another dish` : `${escapeHtml(s.label)} · ${fmtLen(s.lenMs)}${s.note ? ' — ' + escapeHtml(s.note) : ''}`;
+      return `<div class="${cls}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${tip}">${wideEnough ? `<span>${label}</span>` : ''}</div>`;
     }).join('');
 
     return `
@@ -623,6 +654,7 @@ function renderEditor() {
         </div>
         <input class="ed-step-note" value="${escapeHtml(s.note || '')}" placeholder="Note (optional) — e.g. Instant Pot: Manual, 3 min" />
         <label class="ed-step-ahead"><input type="checkbox" class="ed-step-ahead-cb"${s.ahead ? ' checked' : ''} /> Can prep ahead (do any time before it's needed)</label>
+        <label class="ed-step-ahead"><input type="checkbox" class="ed-step-shared-cb"${s.shared ? ' checked' : ''} /> Shared step — same-labeled steps are done once (e.g. Preheat BBQ)</label>
       </div>`).join('');
     wrap.innerHTML = `
       <div class="ed-dish-top">
@@ -648,6 +680,7 @@ function syncDraftFromDom() {
       draft.dishes[di].steps[si].minutes = mins > 0 ? mins : 1; // supports fractional (test) minutes
       draft.dishes[di].steps[si].note = se.querySelector('.ed-step-note').value.trim();
       draft.dishes[di].steps[si].ahead = se.querySelector('.ed-step-ahead-cb').checked;
+      draft.dishes[di].steps[si].shared = se.querySelector('.ed-step-shared-cb').checked;
     });
   });
 }
