@@ -61,6 +61,9 @@ work — new requests go into **Todo**, finished work moves to **Done**.
       remaining steps/timeline re-project from actual completion times. Tasks
       become available on the staggered schedule; the Gantt shows done/active
       states and the now-line advances live.
+- [x] **Startup dish picker modal** — selection moved to a "Choose dishes" modal
+      that launches at startup; the idle Gantt now previews only chosen dishes
+      (reopen via the hero button or when nothing's selected).
 - [x] **Project memory** (`CLAUDE.md`) capturing todo, versioning, deploy workflows
 
 - [x] Establish todo-list workflow (this file)

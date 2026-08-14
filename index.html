@@ -32,6 +32,22 @@
     <span class="version" id="version">V—</span>
   </footer>
 
+  <!-- Dish picker modal (launches at startup) -->
+  <div id="picker" class="editor-overlay" hidden>
+    <div class="editor-panel">
+      <div class="editor-head">
+        <h2>Choose dishes</h2>
+        <button id="picker-close" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <p class="picker-hint">Pick what you're cooking. They'll be sequenced to finish together.</p>
+      <div id="picker-list" class="picker-list"></div>
+      <div class="editor-actions">
+        <button id="picker-edit" class="btn ghost">Edit dishes…</button>
+        <button id="picker-done" class="btn primary">Done</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Editor modal -->
   <div id="editor" class="editor-overlay" hidden>
     <div class="editor-panel">

@@ -431,6 +431,42 @@ main {
 .editor-panel input:focus { outline: 2px solid var(--accent); }
 .editor-actions { display: flex; gap: 10px; margin-top: 16px; }
 
+/* ---- Dish picker ---- */
+.picker-hint { color: var(--muted); font-size: 0.85rem; margin: 0 0 12px; }
+.picker-list { display: flex; flex-direction: column; gap: 8px; }
+.pick-row {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left; cursor: pointer;
+  padding: 11px 12px;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+}
+.pick-row.on { border-color: var(--done); background: rgba(55, 197, 123, 0.10); }
+.pick-row:active { transform: scale(0.99); }
+.pick-check {
+  flex: none; width: 24px; height: 24px; border-radius: 7px;
+  border: 2px solid var(--muted);
+  display: grid; place-items: center;
+  color: #05261a; font-weight: 900; font-size: 0.9rem;
+}
+.pick-row.on .pick-check { background: var(--done); border-color: var(--done); }
+.pick-emoji {
+  flex: none; font-size: 1.3rem; width: 34px; height: 34px;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 9px;
+}
+.pick-name { display: flex; flex-direction: column; min-width: 0; }
+.pick-name strong { font-size: 0.98rem; }
+.pick-name small { color: var(--muted); font-size: 0.78rem; }
+
+.gantt-empty {
+  margin: auto; text-align: center; color: var(--muted); font-size: 0.9rem;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.gantt-empty .btn { flex: none; }
+
 @media (min-width: 520px) {
   .editor-overlay { align-items: center; }
   .editor-panel { border-radius: 20px; }

@@ -126,6 +126,11 @@ const el = {
   editorCancel: document.getElementById('editor-cancel'),
   editorSave: document.getElementById('editor-save'),
   addDish: document.getElementById('add-dish'),
+  picker: document.getElementById('picker'),
+  pickerList: document.getElementById('picker-list'),
+  pickerClose: document.getElementById('picker-close'),
+  pickerDone: document.getElementById('picker-done'),
+  pickerEdit: document.getElementById('picker-edit'),
 };
 
 // ---------- Helpers ----------
@@ -389,12 +394,14 @@ function renderHero(prog) {
     el.hero.innerHTML = `
       <div class="hero-top">
         <span class="hero-label">Ready to cook</span>
-        <span class="hero-clock">${none ? 'pick dishes below' : `${n} dish${n === 1 ? '' : 'es'} · ~${fmtLen(schedule.mealMs)}`}</span>
+        <span class="hero-clock">${none ? 'no dishes chosen' : `${n} dish${n === 1 ? '' : 'es'} · ~${fmtLen(schedule.mealMs)}`}</span>
       </div>
       <div class="hero-time">${none ? '—' : fmtDur(schedule.mealMs)}</div>
       <div class="controls">
+        <button class="btn ghost" id="choose-btn">🍽️ Choose dishes</button>
         <button class="btn primary" id="start-btn"${none ? ' disabled' : ''}>▶ Start meal</button>
       </div>`;
+    el.hero.querySelector('#choose-btn').addEventListener('click', openPicker);
     const btn = el.hero.querySelector('#start-btn');
     if (!none) btn.addEventListener('click', startMeal);
     return;
@@ -486,13 +493,13 @@ function renderGantt(prog) {
   const pct = (ms) => Math.max(0, Math.min(100, (ms / scaleMs) * 100));
   const nowPct = pct(elapsed);
 
-  const picking = !run.started; // idle: show checkboxes + all dishes
+  const picking = !run.started;
+  // Only chosen dishes appear (selection now happens in the picker modal).
   const rows = prog.dishes.map((d) => {
     const di = d.di;
-    // When running, only included dishes appear.
-    if (run.started && !d.included) return '';
+    if (!d.included) return '';
     const hue = dishHue(di);
-    const excluded = !d.included;
+    const excluded = false;
 
     // Per-dish status shown in the label gutter.
     let status, statusCls;
@@ -517,14 +524,9 @@ function renderGantt(prog) {
       return `<div class="${cls}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${escapeHtml(s.label)} · ${fmtLen(s.lenMs)}${s.note ? ' — ' + escapeHtml(s.note) : ''}">${wideEnough ? `<span>${done ? '✓ ' : ''}${escapeHtml(s.label)}</span>` : ''}</div>`;
     }).join('');
 
-    const check = picking
-      ? `<button class="dish-check${excluded ? '' : ' on'}" data-id="${escapeHtml(d.id)}" aria-label="${excluded ? 'Include' : 'Exclude'} ${escapeHtml(d.name)}" aria-pressed="${excluded ? 'false' : 'true'}">${excluded ? '' : '✓'}</button>`
-      : '';
-
     return `
-      <div class="gantt-row${excluded ? ' excluded' : ''}">
+      <div class="gantt-row">
         <div class="gantt-label">
-          ${check}
           <span class="ge">${escapeHtml(d.emoji)}</span>
           <span class="gtxt"><span class="gn">${escapeHtml(d.name)}</span><span class="gs ${statusCls}">${status}</span></span>
         </div>
@@ -540,7 +542,7 @@ function renderGantt(prog) {
     : '';
 
   // Detail line: the tapped step's note (or a hint).
-  let detail = `<span class="gantt-sub">${picking ? 'check dishes to include · all finish together →' : 'tap a block for its note'}</span>`;
+  let detail = `<span class="gantt-sub">${picking ? 'your chosen dishes · all finish together →' : 'tap a block for its note'}</span>`;
   if (selected) {
     const sd = schedule.dishes[selected.di];
     const ss = sd && sd.steps[selected.si];
@@ -556,7 +558,7 @@ function renderGantt(prog) {
       ${detail}
     </div>
     <div class="gantt-rows">
-      ${rows}
+      ${rows || `<div class="gantt-empty">No dishes chosen yet.<br><button class="btn ghost" id="gantt-choose">🍽️ Choose dishes</button></div>`}
       ${nowLayer}
     </div>
     <div class="gantt-axis"><span>0:00</span><span class="ax-end">serve · ${total}</span></div>`;
@@ -686,10 +688,9 @@ el.addDish.addEventListener('click', () => {
   draft.dishes.push({ id: uid(), name: 'New dish', emoji: '🍽️', steps: [{ label: 'Step', minutes: 5, note: '' }] });
   renderEditor();
 });
-// Gantt interactions: toggle a dish's checkbox, or tap a block to read its note.
+// Gantt interactions: open the picker, or tap a block to read its note.
 el.gantt.addEventListener('click', (e) => {
-  const check = e.target.closest('.dish-check');
-  if (check) { toggleDish(check.dataset.id); return; }
+  if (e.target.closest('#gantt-choose')) { openPicker(); return; }
   const seg = e.target.closest('.gseg');
   if (!seg) return;
   const di = +seg.dataset.di, si = +seg.dataset.si;
@@ -709,7 +710,34 @@ el.resetExample.addEventListener('click', () => {
   saveMeal();
   schedule = computeSchedule(meal);
   resetMeal();
+  renderPicker();
 });
+
+// ---------- Dish picker ----------
+function openPicker() { renderPicker(); el.picker.hidden = false; }
+function closePicker() { el.picker.hidden = true; }
+
+function renderPicker() {
+  el.pickerList.innerHTML = schedule.dishes.map((d) => {
+    const on = d.included;
+    const steps = d.steps.length;
+    return `
+      <button class="pick-row${on ? ' on' : ''}" data-id="${escapeHtml(d.id)}" aria-pressed="${on}">
+        <span class="pick-check">${on ? '✓' : ''}</span>
+        <span class="pick-emoji">${escapeHtml(d.emoji)}</span>
+        <span class="pick-name"><strong>${escapeHtml(d.name)}</strong><small>${fmtLen(d.durationMs)} · ${steps} step${steps === 1 ? '' : 's'}</small></span>
+      </button>`;
+  }).join('');
+}
+
+el.picker.addEventListener('click', (e) => {
+  if (e.target === el.picker) { closePicker(); return; }
+  const row = e.target.closest('.pick-row');
+  if (row) { toggleDish(row.dataset.id); renderPicker(); }
+});
+el.pickerClose.addEventListener('click', closePicker);
+el.pickerDone.addEventListener('click', closePicker);
+el.pickerEdit.addEventListener('click', () => { closePicker(); openEditor(); });
 
 // ---------- Boot ----------
 function init() {
@@ -727,6 +755,9 @@ function init() {
   mealDoneNotified = prog0.allDone;
   if (isRunning() && !prog0.allDone) startTicking();
   refresh();
+
+  // Launch the dish picker at startup (only when not mid-cook).
+  if (!run.started) openPicker();
 }
 
 if ('serviceWorker' in navigator) {
