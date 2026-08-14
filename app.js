@@ -105,8 +105,11 @@ let schedule = null;          // derived; see computeSchedule()
 //   started:  has the meal begun at all
 //   runningSince: ms timestamp of last resume (null when paused)
 //   accumMs:  accumulated running time before the current resume
-let run = { started: false, runningSince: null, accumMs: 0 };
-let lastElapsedMs = 0;        // for edge-triggered step chimes
+// run: wall-clock elapsed (runningSince + accumMs) plus doneSteps, a map of
+// stepKey -> completion time (meal-elapsed ms). Persisted so progress survives.
+let run = { started: false, runningSince: null, accumMs: 0, doneSteps: {} };
+let lastActiveKeys = new Set(); // step keys currently available (for new-task chimes)
+let mealDoneNotified = false;
 let tickHandle = null;
 let selected = null;          // { di, si } — Gantt block tapped to inspect its note
 
@@ -201,24 +204,96 @@ function allStepStarts() {
 }
 
 // ---------- Run clock ----------
+// Elapsed time in the meal (wall-clock based, pause-aware). Not capped — with
+// manual completion the meal can run past its planned duration.
 function elapsedMs() {
   if (!run.started) return 0;
-  const running = run.runningSince != null;
-  const live = running ? Date.now() - run.runningSince : 0;
-  return Math.min(run.accumMs + live, schedule.mealMs);
+  const live = run.runningSince != null ? Date.now() - run.runningSince : 0;
+  return run.accumMs + live;
 }
 const isRunning = () => run.started && run.runningSince != null;
-const isDone = () => run.started && elapsedMs() >= schedule.mealMs;
+const stepKey = (dishId, si) => `${dishId}:${si}`;
+
+// Is a step marked complete? Completion times are stored in meal-elapsed ms.
+function isStepDone(dishId, si) {
+  return run.doneSteps ? stepKey(dishId, si) in run.doneSteps : false;
+}
+function isAllDone() {
+  if (!run.started) return false;
+  return schedule.dishes.filter((d) => d.included)
+    .every((d) => d.steps.every((_, si) => isStepDone(d.id, si)));
+}
+
+// Live progression: projects each included dish's steps from actual completion
+// times so the remaining timeline shifts based on when tasks are marked done.
+// Returns per-dish projected step times/states, the available "action" queue,
+// and the projected timeline length.
+function computeProgress() {
+  const elapsed = elapsedMs();
+  const done = run.doneSteps || {};
+  const dishes = [];
+  const actions = [];
+  let timelineMs = schedule.mealMs;
+  let totalSteps = 0, doneCount = 0;
+
+  for (let di = 0; di < schedule.dishes.length; di++) {
+    const d = schedule.dishes[di];
+    if (!d.included) { dishes.push({ ...d, di }); continue; }
+    let cursor = d.startMs;           // planned start of the dish's first step
+    let pendingFound = false;
+    const steps = d.steps.map((s, si) => {
+      const key = stepKey(d.id, si);
+      const finished = key in done;
+      totalSteps++;
+      const projStart = cursor;
+      let projEnd, state;
+      if (finished) {
+        projEnd = done[key];          // actual completion (meal-elapsed)
+        state = 'done';
+        doneCount++;
+      } else {
+        projEnd = cursor + s.lenMs;    // projected by planned duration
+        if (!pendingFound) {
+          pendingFound = true;
+          // First pending step of the dish: available once its start arrives
+          // (first step gated by the staggered plan; later steps unlock the
+          // moment the previous one is marked done).
+          state = elapsed >= projStart - 1 ? 'active' : 'waiting';
+          if (state === 'active') actions.push({ di, si, dish: d, step: { ...s, si, key, projStart, projEnd } });
+        } else {
+          state = 'waiting';
+        }
+      }
+      cursor = projEnd;
+      return { ...s, si, key, projStart, projEnd, state };
+    });
+    timelineMs = Math.max(timelineMs, cursor);
+    dishes.push({ ...d, di, steps, projEnd: cursor });
+  }
+
+  actions.sort((a, b) => a.step.projStart - b.step.projStart);
+  return { elapsed, dishes, actions, timelineMs, totalSteps, doneCount, allDone: doneCount === totalSteps && totalSteps > 0 };
+}
+
+function markDone(dishId, si) {
+  if (!run.started) return;
+  run.doneSteps = run.doneSteps || {};
+  run.doneSteps[stepKey(dishId, si)] = elapsedMs();
+  if ('vibrate' in navigator) navigator.vibrate(30);
+  saveRun();
+  refresh();
+}
 
 function startMeal() {
   if (!schedule.includedCount) return; // nothing selected
   primeAudio();
   requestNotifyPermission();
-  run = { started: true, runningSince: Date.now(), accumMs: 0 };
-  lastElapsedMs = 0;
+  run = { started: true, runningSince: Date.now(), accumMs: 0, doneSteps: {} };
+  lastActiveKeys = new Set();
+  mealDoneNotified = false;
   saveRun();
   startTicking();
-  render();
+  refresh();
 }
 function pauseMeal() {
   if (!isRunning()) return;
@@ -226,49 +301,57 @@ function pauseMeal() {
   run.runningSince = null;
   saveRun();
   stopTicking();
-  render();
+  refresh();
 }
 function resumeMeal() {
-  if (!run.started || isRunning() || isDone()) return;
+  if (!run.started || isRunning() || isAllDone()) return;
   run.runningSince = Date.now();
   saveRun();
   startTicking();
-  render();
+  refresh();
 }
 function resetMeal() {
-  run = { started: false, runningSince: null, accumMs: 0 };
-  lastElapsedMs = 0;
+  run = { started: false, runningSince: null, accumMs: 0, doneSteps: {} };
+  lastActiveKeys = new Set();
+  mealDoneNotified = false;
+  selected = null;
   saveRun();
   stopTicking();
-  render();
+  refresh();
 }
 
 function startTicking() {
   stopTicking();
-  tickHandle = setInterval(tick, 250);
+  tickHandle = setInterval(refresh, 250);
 }
 function stopTicking() {
   if (tickHandle) { clearInterval(tickHandle); tickHandle = null; }
 }
 
-function tick() {
-  const now = elapsedMs();
+// Single update path: recompute progress, fire alerts for newly-available
+// tasks / completion, render, and stop the clock when everything's done.
+function refresh() {
+  const prog = computeProgress();
 
-  // Edge-triggered chimes for step-starts crossed since last tick.
-  for (const s of allStepStarts()) {
-    if (s.at > 0 && s.at > lastElapsedMs && s.at <= now) {
-      notify(`${s.dish.emoji} ${s.step.label}`, s.dish.name);
+  if (run.started && isRunning()) {
+    for (const a of prog.actions) {
+      if (!lastActiveKeys.has(a.step.key)) notify(`${a.dish.emoji} ${a.step.label}`, a.dish.name);
     }
   }
-  if (schedule.mealMs > lastElapsedMs && now >= schedule.mealMs) {
+  lastActiveKeys = new Set(prog.actions.map((a) => a.step.key));
+
+  if (prog.allDone && !mealDoneNotified) {
+    mealDoneNotified = true;
     notify('🍽️ Meal ready!', 'Everything is done — plate up.');
   }
-  lastElapsedMs = now;
 
-  render();
+  renderHero(prog);
+  renderGantt(prog);
 
-  if (isDone()) { stopTicking(); saveRun(); }
+  if (prog.allDone && tickHandle) { stopTicking(); saveRun(); }
+  return prog;
 }
+const render = refresh;
 
 // ---------- Persistence ----------
 function saveMeal() {
@@ -292,26 +375,14 @@ function loadRun() {
     const raw = localStorage.getItem(RUN_KEY);
     if (raw) {
       const r = JSON.parse(raw);
-      if (r && typeof r.started === 'boolean') return r;
+      if (r && typeof r.started === 'boolean') { r.doneSteps = r.doneSteps || {}; return r; }
     }
   } catch (_) {}
-  return { started: false, runningSince: null, accumMs: 0 };
+  return { started: false, runningSince: null, accumMs: 0, doneSteps: {} };
 }
 
 // ---------- Rendering ----------
-function stateColor(name) {
-  return name === 'done' ? 'var(--done)' : name === 'active' ? 'var(--active)' : 'var(--waiting)';
-}
-
-function render() {
-  renderHero();
-  renderGantt();
-}
-
-function renderHero() {
-  const elapsed = elapsedMs();
-  const remaining = schedule.mealMs - elapsed;
-
+function renderHero(prog) {
   if (!run.started) {
     const n = schedule.includedCount;
     const none = n === 0;
@@ -329,7 +400,7 @@ function renderHero() {
     return;
   }
 
-  if (isDone()) {
+  if (prog.allDone) {
     el.hero.innerHTML = `
       <div class="hero-top"><span class="hero-label">Meal complete</span></div>
       <div class="hero-time">🍽️ Ready!</div>
@@ -340,33 +411,60 @@ function renderHero() {
     return;
   }
 
-  // Running or paused. Find the next step that hasn't started yet.
-  const upcoming = allStepStarts().find((s) => s.at > elapsed);
-  const readyAt = Date.now() + remaining;
-  const nextHtml = upcoming
-    ? `<div class="next-step">
-         <span class="ns-emoji">${escapeHtml(upcoming.dish.emoji)}</span>
-         <span class="ns-text"><strong>Next: ${escapeHtml(upcoming.step.label)}</strong><small>${escapeHtml(upcoming.dish.name)}</small>${upcoming.step.note ? `<small class="ns-note">📝 ${escapeHtml(upcoming.step.note)}</small>` : ''}</span>
-         <span class="ns-count">${fmtDur(upcoming.at - elapsed)}</span>
-       </div>`
-    : `<div class="next-step">
-         <span class="ns-emoji">🔥</span>
-         <span class="ns-text"><strong>Final stretch</strong><small>All dishes are underway</small></span>
-         <span class="ns-count">${fmtDur(remaining)}</span>
-       </div>`;
-
+  const elapsed = prog.elapsed;
   const paused = !isRunning();
-  el.hero.innerHTML = `
-    <div class="hero-top">
-      <span class="hero-label">${paused ? 'Paused' : 'Meal ready in'}</span>
-      <span class="hero-clock">done ~${fmtClock(readyAt)}</span>
-    </div>
-    <div class="hero-time">${fmtDur(remaining)}</div>
-    ${nextHtml}
+  const controls = `
     <div class="controls">
       <button class="btn ${paused ? 'primary' : 'warn'}" id="pp-btn">${paused ? '▶ Resume' : '⏸ Pause'}</button>
       <button class="btn ghost" id="reset-btn">Reset</button>
     </div>`;
+
+  const action = prog.actions[0]; // one task at a time
+  if (action) {
+    const s = action.step;
+    const remain = s.projEnd - elapsed;               // guidance countdown
+    const overdue = remain <= 0;
+    const more = prog.actions.length - 1;
+    el.hero.innerHTML = `
+      <div class="hero-top">
+        <span class="hero-label">Do this${paused ? ' · paused' : ''}</span>
+        <span class="hero-clock">${prog.doneCount}/${prog.totalSteps} done${more > 0 ? ` · +${more} ready` : ''}</span>
+      </div>
+      <div class="action">
+        <span class="action-emoji">${escapeHtml(action.dish.emoji)}</span>
+        <div class="action-text">
+          <strong>${escapeHtml(s.label)}</strong>
+          <small>${escapeHtml(action.dish.name)}</small>
+          ${s.note ? `<small class="ns-note">📝 ${escapeHtml(s.note)}</small>` : ''}
+        </div>
+        <span class="action-count${overdue ? ' over' : ''}">${overdue ? 'go' : fmtDur(remain)}</span>
+      </div>
+      <button class="btn primary big" id="done-btn">✓ Tap when complete</button>
+      ${controls}`;
+    el.hero.querySelector('#done-btn').addEventListener('click', () => markDone(action.dish.id, s.si));
+  } else {
+    // Nothing available yet — waiting for the next dish's start time.
+    let soonest = null;
+    for (const d of prog.dishes) {
+      if (!d.included || !d.steps) continue;
+      const next = d.steps.find((st) => st.state === 'waiting');
+      if (next && (!soonest || next.projStart < soonest.projStart)) soonest = { dish: d, step: next };
+    }
+    const wait = soonest ? soonest.step.projStart - elapsed : 0;
+    el.hero.innerHTML = `
+      <div class="hero-top">
+        <span class="hero-label">${paused ? 'Paused' : 'Standing by'}</span>
+        <span class="hero-clock">${prog.doneCount}/${prog.totalSteps} done</span>
+      </div>
+      <div class="hero-time small">${soonest ? fmtDur(Math.max(0, wait)) : '—'}</div>
+      ${soonest ? `<div class="next-step">
+        <span class="ns-emoji">${escapeHtml(soonest.dish.emoji)}</span>
+        <span class="ns-text"><strong>Up next: ${escapeHtml(soonest.step.label)}</strong><small>${escapeHtml(soonest.dish.name)}</small></span>
+        <span class="ns-count">${fmtDur(Math.max(0, wait))}</span>
+      </div>` : ''}
+      ${controls}`;
+  }
+
   el.hero.querySelector('#pp-btn').addEventListener('click', paused ? resumeMeal : pauseMeal);
   el.hero.querySelector('#reset-btn').addEventListener('click', () => {
     if (confirm('Reset the whole meal timer?')) resetMeal();
@@ -382,14 +480,15 @@ function stepColor(hue, idx, total) {
   return `hsl(${hue} 80% ${l}%)`;
 }
 
-function renderGantt() {
-  const elapsed = elapsedMs();
-  const mealMs = schedule.mealMs || 1;
-  const pct = (ms) => Math.max(0, Math.min(100, (ms / mealMs) * 100));
+function renderGantt(prog) {
+  const elapsed = prog.elapsed;
+  const scaleMs = (run.started ? prog.timelineMs : schedule.mealMs) || 1;
+  const pct = (ms) => Math.max(0, Math.min(100, (ms / scaleMs) * 100));
   const nowPct = pct(elapsed);
 
   const picking = !run.started; // idle: show checkboxes + all dishes
-  const rows = schedule.dishes.map((d, di) => {
+  const rows = prog.dishes.map((d) => {
+    const di = d.di;
     // When running, only included dishes appear.
     if (run.started && !d.included) return '';
     const hue = dishHue(di);
@@ -397,21 +496,25 @@ function renderGantt() {
 
     // Per-dish status shown in the label gutter.
     let status, statusCls;
-    if (!run.started) { status = fmtLen(d.durationMs); statusCls = excluded ? 'off' : ''; }
-    else if (elapsed < d.startMs) { status = `in ${fmtDur(d.startMs - elapsed)}`; statusCls = 'wait'; }
-    else if (elapsed >= d.endMs) { status = '✓ done'; statusCls = 'done'; }
-    else {
-      const cur = d.steps.find((s) => elapsed >= s.startMs && elapsed < s.endMs) || d.steps[d.steps.length - 1];
-      status = `${fmtDur(cur.endMs - elapsed)} left`; statusCls = 'cook';
+    if (!run.started) {
+      status = fmtLen(d.durationMs); statusCls = excluded ? 'off' : '';
+    } else {
+      const active = d.steps.find((s) => s.state === 'active');
+      const waiting = d.steps.find((s) => s.state === 'waiting');
+      if (d.steps.every((s) => s.state === 'done')) { status = '✓ done'; statusCls = 'done'; }
+      else if (active) { const r = active.projEnd - elapsed; status = r <= 0 ? 'go now' : `${fmtDur(r)} left`; statusCls = 'cook'; }
+      else if (waiting) { status = `in ${fmtDur(Math.max(0, waiting.projStart - elapsed))}`; statusCls = 'wait'; }
+      else { status = ''; statusCls = ''; }
     }
 
     // Excluded dishes have no timeline position — show no blocks.
     const segs = excluded ? '' : d.steps.map((s, si) => {
-      const left = pct(s.startMs), width = Math.max(0.8, pct(s.endMs) - pct(s.startMs));
-      const active = run.started && elapsed >= s.startMs && elapsed < s.endMs;
+      const left = pct(s.projStart), width = Math.max(0.8, pct(s.projEnd) - pct(s.projStart));
       const isSel = selected && selected.di === di && selected.si === si;
       const wideEnough = width >= 9;
-      return `<div class="gseg${active ? ' active' : ''}${isSel ? ' sel' : ''}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${escapeHtml(s.label)} · ${fmtLen(s.lenMs)}${s.note ? ' — ' + escapeHtml(s.note) : ''}">${wideEnough ? `<span>${escapeHtml(s.label)}</span>` : ''}</div>`;
+      const done = run.started && s.state === 'done';
+      const cls = `gseg${run.started ? ' ' + s.state : ''}${isSel ? ' sel' : ''}`;
+      return `<div class="${cls}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${escapeHtml(s.label)} · ${fmtLen(s.lenMs)}${s.note ? ' — ' + escapeHtml(s.note) : ''}">${wideEnough ? `<span>${done ? '✓ ' : ''}${escapeHtml(s.label)}</span>` : ''}</div>`;
     }).join('');
 
     const check = picking
@@ -432,12 +535,12 @@ function renderGantt() {
   const nowLayer = run.started
     ? `<div class="gantt-now-layer">
          <div class="gantt-consumed" style="width:${nowPct}%"></div>
-         <div class="gantt-nowline" style="left:${nowPct}%"><span class="now-flag">${isDone() ? 'done' : fmtDur(elapsed)}</span></div>
+         <div class="gantt-nowline" style="left:${nowPct}%"><span class="now-flag">${prog.allDone ? 'done' : fmtDur(elapsed)}</span></div>
        </div>`
     : '';
 
   // Detail line: the tapped step's note (or a hint).
-  let detail = `<span class="gantt-sub">${picking ? 'check dishes to include · all finish together →' : 'tap a block for its note · all finish together →'}</span>`;
+  let detail = `<span class="gantt-sub">${picking ? 'check dishes to include · all finish together →' : 'tap a block for its note'}</span>`;
   if (selected) {
     const sd = schedule.dishes[selected.di];
     const ss = sd && sd.steps[selected.si];
@@ -446,7 +549,7 @@ function renderGantt() {
     }
   }
 
-  const total = fmtDur(mealMs);
+  const total = fmtDur(scaleMs);
   el.gantt.innerHTML = `
     <div class="gantt-head">
       <span class="gantt-title">Meal timeline</span>
@@ -617,8 +720,13 @@ function init() {
   meal.dishes.forEach((d) => { if (!d.id) d.id = uid(); });
   schedule = computeSchedule(meal);
   run = loadRun();
-  if (isRunning()) { lastElapsedMs = elapsedMs(); startTicking(); }
-  render();
+  // Prime alert state from the current progress so reopening a running meal
+  // doesn't re-chime every already-available task.
+  const prog0 = computeProgress();
+  lastActiveKeys = new Set(prog0.actions.map((a) => a.step.key));
+  mealDoneNotified = prog0.allDone;
+  if (isRunning() && !prog0.allDone) startTicking();
+  refresh();
 }
 
 if ('serviceWorker' in navigator) {
@@ -629,7 +737,7 @@ if ('serviceWorker' in navigator) {
 
 // Re-sync when the app returns to foreground (wall clock may have jumped).
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && isRunning()) { lastElapsedMs = elapsedMs(); render(); }
+  if (!document.hidden && isRunning()) refresh();
 });
 
 init();

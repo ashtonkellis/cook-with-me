@@ -56,19 +56,33 @@ await page.waitForTimeout(100);
 
 // Start the (test) meal
 await page.click('#start-btn');
-await page.waitForTimeout(600);
+await page.waitForTimeout(400);
 const runningLanes = await page.$$eval('.gantt-row', (n) => n.length);
 console.log('lanes while running (only included, expect 3):', runningLanes);
 const nowline = await page.$('.gantt-nowline');
 console.log('now-line present:', !!nowline);
-const statuses = await page.$$eval('.gantt-label .gs', (ns) => ns.map((n) => n.textContent));
-console.log('lane statuses:', statuses);
+
+// Guided model: exactly one action card + a "Tap when complete" button.
+const actionCards = await page.$$eval('.action', (n) => n.length);
+const doneBtn = await page.$('#done-btn');
+const progLabel1 = (await page.textContent('.hero-clock')).trim();
+console.log('action cards (expect 1):', actionCards, '| done-btn:', !!doneBtn, '| progress:', progLabel1);
+const actionTitle = await page.textContent('.action-text strong');
+console.log('current task:', actionTitle.trim());
+
+// Complete the current task -> progress advances, a done block appears.
+await page.click('#done-btn');
+await page.waitForTimeout(200);
+const progLabel2 = (await page.textContent('.hero-clock')).trim();
+const doneBlocks = await page.$$eval('.gseg.done', (n) => n.length);
+console.log('after tapping complete -> progress:', progLabel2, '| done blocks:', doneBlocks);
 await page.screenshot({ path: 'tools/shot-running.png' });
 
-// Persistence across reload.
+// Persistence across reload (completion + elapsed both survive).
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-console.log('hero after reload (still running):', (await page.textContent('.hero-time')).trim());
+const progAfterReload = (await page.textContent('.hero-clock')).trim();
+console.log('progress after reload (should keep completions):', progAfterReload);
 
 // Editor opens and lists all dishes.
 await page.click('#edit-btn');
@@ -77,9 +91,12 @@ const edDishes = await page.$$eval('.ed-dish', (n) => n.length);
 console.log('editor opens, dishes listed:', edDishes);
 await page.click('#editor-close');
 
-// Done state (a real 25-min-ago start is well past the ~15s test meal).
-await page.evaluate(() => localStorage.setItem('cook-with-me:run',
-  JSON.stringify({ started: true, runningSince: Date.now() - 25 * 60000, accumMs: 0 })));
+// Done state: mark every included step complete.
+await page.evaluate(() => {
+  const doneSteps = {};
+  for (const id of ['test-chicken', 'test-rice', 'test-veggies']) for (let i = 0; i < 3; i++) doneSteps[`${id}:${i}`] = 1000;
+  localStorage.setItem('cook-with-me:run', JSON.stringify({ started: true, runningSince: Date.now() - 60000, accumMs: 0, doneSteps }));
+});
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
 console.log('done hero:', (await page.textContent('.hero-time')).trim());

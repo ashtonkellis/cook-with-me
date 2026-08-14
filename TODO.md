@@ -56,6 +56,11 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 - [x] **Dish library expanded** — added BBQ steak, BBQ chicken breast, BBQ corn,
       boiled veggies, and fast test chicken/rice/veggies (test dishes selected
       by default for a ~15s end-to-end run)
+- [x] **Guided action cards** — one "DO THIS" task card at a time with a
+      "Tap when complete" button; completions are recorded (persisted) and the
+      remaining steps/timeline re-project from actual completion times. Tasks
+      become available on the staggered schedule; the Gantt shows done/active
+      states and the now-line advances live.
 - [x] **Project memory** (`CLAUDE.md`) capturing todo, versioning, deploy workflows
 
 - [x] Establish todo-list workflow (this file)
