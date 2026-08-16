@@ -26,6 +26,10 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Trim to 3 dishes** — BBQ chicken (prep & season = prep; preheat/side1/side2
+      = timed), Rice (cook = timed; measure/wash + setup = prep), Stir-fried
+      veggies (prep = prep; preheat pan + cook = timed). All selected by default.
+      (Removed the fast test dishes — the ~15s end-to-end shortcut is gone.)
 - [x] **Core meal-timer rewrite** — full requested feature set:
   - [x] Data model: dish = { name, emoji, steps[] }; example 3-dish meal seeded
   - [x] Scheduler: sequence each dish so all finish together (start = mealDur − dishDur)

@@ -8,88 +8,31 @@
 // before starting). By default only the fast TEST dishes are selected, so the
 // app opens ready for a ~15-second end-to-end run.
 const EXAMPLE_MEAL = {
-  name: 'BBQ cookout',
+  name: 'BBQ dinner',
   dishes: [
     {
-      id: 'chicken', name: 'BBQ chicken thighs', emoji: '🍗', included: false,
+      id: 'chicken', name: 'BBQ chicken', emoji: '🍗', included: true,
       steps: [
+        { label: 'Prep & season chicken', minutes: 5, prep: true, note: 'Pat dry, salt + rub, bring to room temp.' },
         { label: 'Preheat BBQ', minutes: 5, shared: true, note: 'Medium-high, ~450°F. Oil the grates.' },
         { label: 'Cook side 1', minutes: 8, note: 'Skin-side down. Don’t move them — let the skin crisp.' },
         { label: 'Cook side 2', minutes: 8, note: 'Flip once. Pull at 175°F internal.' },
       ],
     },
     {
-      id: 'rice', name: 'Rice', emoji: '🍚', included: false,
+      id: 'rice', name: 'Rice', emoji: '🍚', included: true,
       steps: [
         { label: 'Measure & wash rice', minutes: 3, prep: true, note: '2 cups rice, rinse until water runs clear.' },
-        { label: 'Set up Instant Pot', minutes: 3, note: 'Add rinsed rice + 1:1 water. Seal, valve to Sealing.' },
+        { label: 'Set up Instant Pot', minutes: 3, prep: true, note: 'Add rinsed rice + 1:1 water. Seal, valve to Sealing.' },
         { label: 'Cook rice', minutes: 10, note: 'Instant Pot: Manual / Pressure Cook, 3 min, then natural release.' },
       ],
     },
     {
-      id: 'veggies', name: 'Stir-fried veggies', emoji: '🥦', included: false,
+      id: 'veggies', name: 'Stir-fried veggies', emoji: '🥦', included: true,
       steps: [
         { label: 'Prep veggies', minutes: 6, prep: true, note: 'Broccoli, peppers, snap peas — bite-size, uniform. Chop any time ahead.' },
         { label: 'Preheat pan', minutes: 3, note: 'Wok or skillet, high heat, 1 tbsp oil until shimmering.' },
         { label: 'Cook veggies', minutes: 10, note: 'Toss constantly. Add garlic + soy at the end.' },
-      ],
-    },
-    {
-      id: 'steak', name: 'BBQ steak', emoji: '🥩', included: false,
-      steps: [
-        { label: 'Preheat BBQ', minutes: 5, shared: true, note: 'High heat for a good sear.' },
-        { label: 'Cook side 1', minutes: 8 },
-        { label: 'Cook side 2', minutes: 8 },
-        { label: 'Rest', minutes: 5, note: 'Tent with foil — let the juices settle.' },
-      ],
-    },
-    {
-      id: 'chicken-breast', name: 'BBQ chicken breast', emoji: '🐔', included: false,
-      steps: [
-        { label: 'Preheat BBQ', minutes: 5, shared: true },
-        { label: 'Cook side 1', minutes: 15 },
-        { label: 'Cook side 2', minutes: 15, note: 'Pull at 165°F internal.' },
-      ],
-    },
-    {
-      id: 'corn', name: 'BBQ corn', emoji: '🌽', included: false,
-      steps: [
-        { label: 'Preheat BBQ', minutes: 5, shared: true },
-        { label: 'Side 1', minutes: 5 },
-        { label: 'Side 2', minutes: 5 },
-        { label: 'Side 3', minutes: 5 },
-        { label: 'Side 4', minutes: 5 },
-      ],
-    },
-    {
-      id: 'boiled-veggies', name: 'Boiled veggies', emoji: '🫑', included: false,
-      steps: [
-        { label: 'Boil water', minutes: 5 },
-        { label: 'Cook veggies', minutes: 10 },
-      ],
-    },
-    {
-      id: 'test-chicken', name: 'Test chicken', emoji: '🐔', included: true,
-      steps: [
-        { label: 'Preheat', minutes: 0.08, note: 'Fast test step.' },
-        { label: 'Side 1', minutes: 0.08 },
-        { label: 'Side 2', minutes: 0.08 },
-      ],
-    },
-    {
-      id: 'test-rice', name: 'Test rice', emoji: '🍚', included: true,
-      steps: [
-        { label: 'Setup', minutes: 0.05 },
-        { label: 'Wash', minutes: 0.05 },
-        { label: 'Cook', minutes: 0.08 },
-      ],
-    },
-    {
-      id: 'test-veggies', name: 'Test veggies', emoji: '🥗', included: true,
-      steps: [
-        { label: 'Chop', minutes: 0.05, prep: true, note: 'Prep task — do any time.' },
-        { label: 'Preheat', minutes: 0.05 },
-        { label: 'Cook', minutes: 0.08 },
       ],
     },
   ],

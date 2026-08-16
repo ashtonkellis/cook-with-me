@@ -52,8 +52,8 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
   - `shared` — same-labeled shared steps across included dishes are one physical
     task, owned by the earliest dish; redundant copies are skipped/auto-done.
   - `included` picks which dishes are in the meal (chosen in the picker modal).
-  Emoji is the per-dish "image". A dish library (BBQ dishes + fast test dishes)
-  is seeded; the 3 test dishes are selected by default.
+  Emoji is the per-dish "image". Seeded meal: BBQ chicken, Rice, Stir-fried
+  veggies (all selected by default).
 - **Guided model**: `computeProgress()` projects step times/states from actual
   completions (`run.doneSteps`), yielding the one-at-a-time action queue and the
   live Gantt. Completion is fully manual ("Tap when complete").
