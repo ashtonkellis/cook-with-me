@@ -61,7 +61,6 @@ const el = {
   hero: document.getElementById('hero'),
   dishes: document.getElementById('dishes'),
   gantt: document.getElementById('gantt'),
-  resetExample: document.getElementById('reset-example'),
   editBtn: document.getElementById('edit-btn'),
   chooseTop: document.getElementById('choose-top'),
   editor: document.getElementById('editor'),
@@ -418,14 +417,39 @@ function saveMeal() {
 function saveRun() {
   try { localStorage.setItem(RUN_KEY, JSON.stringify(run)); } catch (_) {}
 }
+const MIGRATION_KEY = 'cook-with-me:migrated';
+const MIGRATION_VERSION = '1';
+// One-time heal for meals saved before prep/shared were categorized correctly.
+// For each seed dish (matched by id), copy the canonical prep/shared flags onto
+// the saved dish's matching steps (matched by label). Runs once — guarded by a
+// version flag — so it never overrides the user's later edits.
+function migrateMeal(m) {
+  try {
+    if (localStorage.getItem(MIGRATION_KEY) === MIGRATION_VERSION) return m;
+    for (const seed of EXAMPLE_MEAL.dishes) {
+      const dish = m.dishes.find((d) => d.id === seed.id);
+      if (!dish || !Array.isArray(dish.steps)) continue;
+      for (const seedStep of seed.steps) {
+        const step = dish.steps.find((s) => s.label === seedStep.label);
+        if (!step) continue;
+        if (seedStep.prep) step.prep = true; else { delete step.prep; delete step.ahead; }
+        if (seedStep.shared) step.shared = true;
+      }
+    }
+    localStorage.setItem(MIGRATION_KEY, MIGRATION_VERSION);
+    localStorage.setItem(MEAL_KEY, JSON.stringify(m));
+  } catch (_) {}
+  return m;
+}
 function loadMeal() {
   try {
     const raw = localStorage.getItem(MEAL_KEY);
     if (raw) {
       const m = JSON.parse(raw);
-      if (m && Array.isArray(m.dishes) && m.dishes.length) return m;
+      if (m && Array.isArray(m.dishes) && m.dishes.length) return migrateMeal(m);
     }
   } catch (_) {}
+  try { localStorage.setItem(MIGRATION_KEY, MIGRATION_VERSION); } catch (_) {}
   return JSON.parse(JSON.stringify(EXAMPLE_MEAL));
 }
 function loadRun() {
@@ -577,8 +601,11 @@ function renderGantt(prog) {
   const remainingMs = Math.max(0, prog.timelineMs - elapsed);
   const doneClock = fmtClock(Date.now() + remainingMs);
 
-  // Detail line: the tapped step's note, else the calculated done time.
-  let detail = `<span class="gantt-sub">🍽️ ready ~${doneClock}${run.started ? '' : ' (if you start now)'}</span>`;
+  // Detail line: the tapped step's note, else the meal-done countdown + clock.
+  const doneLabel = run.started
+    ? `🍽️ ready in <b>${fmtDur(remainingMs)}</b> · ~${doneClock}`
+    : `🍽️ ready ~${doneClock} if you start now`;
+  let detail = `<span class="gantt-sub">${doneLabel}</span>`;
   if (selected) {
     const sd = schedule.dishes[selected.di];
     const ss = sd && sd.steps[selected.si];
@@ -625,11 +652,10 @@ function renderGantt(prog) {
   const paused = !isRunning();
   let cookBar;
   if (!schedule.includedCount) {
-    cookBar = `<div class="cook-controls"><button class="btn primary full" id="choose-btn">🍽️ Choose dishes</button></div>`;
+    cookBar = `<div class="cook-empty">No dishes chosen — tap 🍽️ up top to pick what you're cooking.</div>`;
   } else if (!run.started) {
     cookBar = `<div class="cook-controls">
-      <button class="btn ghost" id="choose-btn">🍽️ Choose dishes</button>
-      <button class="btn primary" id="start-btn">▶ Start cooking</button>
+      <button class="btn primary full" id="start-btn">▶ Start cooking</button>
     </div>`;
   } else if (prog.allDone) {
     cookBar = `<div class="timed-now alldone">🍽️ Meal ready — everything's done!</div>
@@ -787,15 +813,17 @@ el.addDish.addEventListener('click', () => {
   draft.dishes.push({ id: uid(), name: 'New dish', emoji: '🍽️', steps: [{ label: 'Step', minutes: 5, note: '' }] });
   renderEditor();
 });
-// Prep to-do list: tap a row's checkbox to toggle it complete.
+// Prep to-do list: tap anywhere on a row to toggle it complete (the whole row
+// is the tap target, not just the checkbox — easier to hit on touch).
 el.hero.addEventListener('click', (e) => {
-  const pt = e.target.closest('.pt-check');
-  if (pt) { toggleStepDone(pt.dataset.id, +pt.dataset.si); return; }
+  const row = e.target.closest('.pt-item');
+  if (!row) return;
+  const chk = row.querySelector('.pt-check');
+  if (chk) { toggleStepDone(chk.dataset.id, +chk.dataset.si); return; }
 });
 el.gantt.addEventListener('click', (e) => {
   const td = e.target.closest('#timed-done');
   if (td) { markDone(td.dataset.id, +td.dataset.si); return; }
-  if (e.target.closest('#choose-btn') || e.target.closest('#gantt-choose')) { openPicker(); return; }
   if (e.target.closest('#start-btn')) { startMeal(); return; }
   if (e.target.closest('#rew-btn')) { nudgeClock(-15000); return; }
   if (e.target.closest('#ff-btn')) { nudgeClock(15000); return; }
@@ -817,15 +845,6 @@ el.editorClose.addEventListener('click', closeEditor);
 el.editorCancel.addEventListener('click', closeEditor);
 el.editorSave.addEventListener('click', saveEditor);
 el.editor.addEventListener('click', (e) => { if (e.target === el.editor) closeEditor(); });
-
-el.resetExample.addEventListener('click', () => {
-  if (!confirm('Load the example meal? This replaces the current meal.')) return;
-  meal = JSON.parse(JSON.stringify(EXAMPLE_MEAL));
-  saveMeal();
-  schedule = computeSchedule(meal);
-  resetMeal();
-  renderPicker();
-});
 
 // ---------- Dish picker ----------
 function openPicker() { renderPicker(); el.picker.hidden = false; }

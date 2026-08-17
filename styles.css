@@ -68,8 +68,9 @@ body {
   border-radius: 12px;
   font-size: 1.1rem;
   cursor: pointer;
+  transition: transform 90ms ease, filter 90ms ease;
 }
-.icon-btn:active { transform: scale(0.96); }
+.icon-btn:active { transform: scale(0.9); filter: brightness(1.25); }
 
 /* ---- Layout ---- */
 main {
@@ -134,6 +135,7 @@ main {
 
 /* Cooking controls (Start / Pause / Reset / ±15s) live at the bottom */
 .cook-controls { flex: none; display: flex; gap: 8px; margin-bottom: 8px; }
+.cook-empty { flex: none; color: var(--muted); font-size: 0.9rem; text-align: center; padding: 10px 8px; margin-bottom: 8px; }
 .cook-controls .btn { flex: 1; padding: 11px 12px; }
 .cook-controls .btn.sm { flex: 0 1 auto; padding: 11px 10px; font-size: 0.82rem; white-space: nowrap; }
 .btn.full { width: 100%; flex: none; }
@@ -195,7 +197,10 @@ main {
   padding: 8px 10px; border-radius: 11px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 90ms ease, filter 90ms ease;
 }
+.pt-item:active { transform: scale(0.985); filter: brightness(1.15); }
 .pt-item.current {
   background: rgba(252, 166, 2, 0.10);
   border-color: rgba(252, 166, 2, 0.45);
@@ -280,7 +285,8 @@ main {
 }
 .gantt-detail { font-size: 0.76rem; color: var(--ink); }
 .gantt-detail b { color: var(--active); }
-.gseg { cursor: pointer; }
+.gseg { cursor: pointer; transition: filter 90ms ease; }
+.gseg:active { filter: brightness(1.2); }
 .gseg.sel { box-shadow: 0 0 0 2px var(--accent), 0 0 12px 1px hsl(var(--hue) 90% 60% / 0.5); z-index: 3; }
 
 .gantt-rows {
@@ -418,7 +424,8 @@ main {
 .btn.warn { background: var(--active); color: #2a1800; }
 .btn.ghost { background: transparent; border-color: var(--line); color: var(--muted); }
 .btn.full { width: 100%; flex: none; }
-.btn:active { transform: translateY(1px); }
+.btn { transition: transform 90ms ease, filter 90ms ease; }
+.btn:active { transform: scale(0.97) translateY(1px); filter: brightness(1.12); }
 .btn:disabled { opacity: 0.5; }
 
 .link-btn {

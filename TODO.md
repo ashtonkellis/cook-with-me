@@ -10,7 +10,7 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## In Progress
 
-- (nothing)
+- (nothing in progress)
 
 ## Backlog / ideas (not scheduled — don't gate deploys)
 
@@ -20,6 +20,15 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Prep/UI polish batch (V19)** — auto-heal stale saved meals so the seed
+      dishes always get the right prep categorization (fixes prep steps showing
+      in the Gantt on old localStorage data, run once via a migration flag);
+      removed the "Choose dishes" button from the Gantt (header 🍽️ icon only,
+      full-width Start cooking); whole prep row is now a tap target (fixes hard-
+      to-tap "Prep veggies" near the scroll edge); subtle tap feedback (scale +
+      brightness) on buttons, icons, prep rows, and Gantt blocks; meal-done
+      countdown + clock ("ready in 20:44 · ~9:19 PM"); removed the "Load example
+      meal" footer link.
 - [x] **Cooking-flow batch (V18)** — dishes with no prep count as prep-ready
       (green); "Choose dishes" moved to a header icon; calculated done time
       ("ready ~7:51 PM"); countdown to the next step while cooking; tapping Done

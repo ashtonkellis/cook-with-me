@@ -32,6 +32,17 @@ console.log('prep order (dish order — chicken, rice, rice, veggies):', JSON.st
 console.log('start-cooking button present:', !!(await page.$('#start-btn')),
   '| timed bar yet:', !!(await page.$('#timed-done')),
   '| gantt lanes:', await page.$$eval('.gantt-row', (n) => n.length));
+// "Choose dishes" is gone from the Gantt (header icon only), and the footer
+// "Load example meal" link is removed.
+console.log('gantt choose-btn removed:', !(await page.$('#choose-btn')),
+  '| footer load-example removed:', !(await page.$('#reset-example')),
+  '| meal-done countdown:', /start now|ready in/.test(await page.$eval('.gantt-sub', (n) => n.textContent).catch(() => '')));
+// Whole prep ROW is a tap target (not just the checkbox): tap the text and it toggles.
+await page.click('.prep-todo .pt-item:first-child .pt-text');
+await page.waitForTimeout(100);
+console.log('whole prep row tappable:', await page.$eval('.prep-todo .pt-item:first-child', (n) => n.classList.contains('done')));
+await page.click('.prep-todo .pt-item:first-child .pt-text');
+await page.waitForTimeout(100);
 
 const scroll1 = await page.evaluate(() => ({ s: document.body.scrollHeight, c: document.documentElement.clientHeight }));
 console.log('idle no-scroll:', scroll1.s <= scroll1.c + 1 ? 'FITS' : `SCROLLS (${scroll1.s}>${scroll1.c})`);
