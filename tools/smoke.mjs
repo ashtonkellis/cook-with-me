@@ -54,8 +54,12 @@ await page.click('#start-btn');
 await page.waitForTimeout(400);
 console.log('lanes running:', await page.$$eval('.gantt-row', (n) => n.length), '| now-line:', !!(await page.$('.gantt-nowline')));
 
-// Top = prep hero. Prep order: chicken cooks first, so its prep is first.
-console.log('first prep task (expect Prep & season chicken):', (await page.textContent('.action-text strong')).trim());
+// Top = full prep to-do list (all 4 prep items). Order: chicken cooks first.
+const prepItems = await page.$$eval('.prep-todo .pt-item', (ns) => ns.length);
+const firstPrep = (await page.textContent('.prep-todo .pt-item.current .pt-text b')).trim();
+console.log('prep to-do items (expect 4):', prepItems, '| current (expect Prep & season chicken):', firstPrep);
+// Every timed step block carries an info icon.
+console.log('step info icons present:', await page.$$eval('.gseg .seg-i', (n) => n.length), '(should be > 0)');
 // Timed bar = current timed task (chicken Preheat BBQ).
 console.log('timed bar:', (await page.$eval('.timed-now', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim());
 // Every dish has prep -> 3 pending prep badges.
@@ -67,10 +71,17 @@ const runScroll = await page.evaluate(() => ({
 console.log('running no-scroll:', runScroll.scrollH <= runScroll.client + 1 ? 'FITS' : `SCROLLS (${runScroll.scrollH}>${runScroll.client})`);
 await page.screenshot({ path: 'tools/shot-prep.png' });
 
-// Complete all 4 prep tasks via the prep hero.
+// Tap a step block -> its details show in the header detail line.
+await page.click('.gantt-row:first-child .gseg');
+await page.waitForTimeout(120);
+console.log('tapped step detail:', (await page.$eval('.gantt-detail', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim());
+
+// Complete all 4 prep tasks via the to-do checkboxes.
 let clicks = 0;
-while ((await page.$('#done-btn')) && clicks < 8) { await page.click('#done-btn'); await page.waitForTimeout(80); clicks++; }
-console.log('completed prep tasks:', clicks, '| top prep-done:', !!(await page.$('.prep-empty')),
+while ((await page.$('.pt-item:not(.done) .pt-check')) && clicks < 8) {
+  await page.click('.pt-item:not(.done) .pt-check'); await page.waitForTimeout(80); clicks++;
+}
+console.log('completed prep tasks:', clicks, '| all prep done:', (await page.$$eval('.pt-item.done', (n) => n.length)),
   '| lanes prep-ready (expect 3):', await page.$$eval('.lane-prep.done', (n) => n.length));
 
 // Complete a timed task -> a done block appears.

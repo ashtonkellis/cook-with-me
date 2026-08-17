@@ -211,6 +211,7 @@ function computeProgress() {
   const dishes = [];
   const timedActions = [];
   const prepPending = [];
+  const prepAll = [];
   let timelineMs = schedule.mealMs;
   let timedTotal = 0, timedDone = 0, prepTotal = 0, prepDone = 0;
 
@@ -230,7 +231,9 @@ function computeProgress() {
       if (s.prep) {
         if (!redundant) { prepTotal++; if (finished) prepDone++; }
         const state = finished ? 'done' : (redundant ? (ownerDone ? 'shared-done' : 'shared') : 'pending');
-        if (!redundant && !finished) prepPending.push({ di, si, key, dish: d, step: { ...s, si, key, shareCount } });
+        const entry = { di, si, key, dish: d, step: { ...s, si, key, shareCount }, done: finished };
+        if (!redundant) prepAll.push(entry);
+        if (!redundant && !finished) prepPending.push(entry);
         return { ...s, si, key, state, redundant, shareCount };
       }
 
@@ -265,11 +268,13 @@ function computeProgress() {
   timedActions.sort((a, b) => a.step.projStart - b.step.projStart);
   // Prep tasks are ordered by when their dish's timed cooking begins — so the
   // prep for the dish that starts cooking first is first in the list.
-  prepPending.sort((a, b) => (a.dish.startMs - b.dish.startMs) || (a.di - b.di) || (a.si - b.si));
+  const byCookOrder = (a, b) => (a.dish.startMs - b.dish.startMs) || (a.di - b.di) || (a.si - b.si);
+  prepPending.sort(byCookOrder);
+  prepAll.sort(byCookOrder);
   const totalSteps = prepTotal + timedTotal;
   const doneCount = prepDone + timedDone;
   return {
-    elapsed, dishes, timedActions, prepPending, timelineMs,
+    elapsed, dishes, timedActions, prepPending, prepAll, timelineMs,
     prepTotal, prepDone, timedTotal, timedDone, totalSteps, doneCount,
     allDone: totalSteps > 0 && doneCount === totalSteps,
   };
@@ -280,6 +285,17 @@ function markDone(dishId, si) {
   run.doneSteps = run.doneSteps || {};
   run.doneSteps[stepKey(dishId, si)] = elapsedMs();
   if ('vibrate' in navigator) navigator.vibrate(30);
+  saveRun();
+  refresh();
+}
+// Toggle completion (used by prep checkboxes so a mistaken tap can be undone).
+function toggleStepDone(dishId, si) {
+  if (!run.started) return;
+  run.doneSteps = run.doneSteps || {};
+  const k = stepKey(dishId, si);
+  if (k in run.doneSteps) delete run.doneSteps[k];
+  else run.doneSteps[k] = elapsedMs();
+  if ('vibrate' in navigator) navigator.vibrate(20);
   saveRun();
   refresh();
 }
@@ -424,43 +440,38 @@ function renderHero(prog) {
       <button class="btn ghost" id="reset-btn">Reset</button>
     </div>`;
 
-  const prep = prog.prepPending;
-  if (prep.length) {
-    const cur = prep[0];
-    const s = cur.step;
-    const rest = prep.slice(1);
-    const restHtml = rest.map((p) => `
-      <li>
-        <span class="pl-emoji">${escapeHtml(p.dish.emoji)}</span>
-        <span class="pl-text"><b>${escapeHtml(p.step.label)}</b><small>${escapeHtml(p.dish.name)}</small></span>
-        <button class="pl-done" data-id="${escapeHtml(p.dish.id)}" data-si="${p.si}" aria-label="Complete ${escapeHtml(p.step.label)}">✓</button>
-      </li>`).join('');
+  const prepAll = prog.prepAll || [];
+  const currentKey = prog.prepPending[0] ? prog.prepPending[0].key : null;
+  if (prepAll.length) {
+    // Full to-do list of every prep task (done + pending), in cook order.
+    const items = prepAll.map((p) => {
+      const isCur = p.key === currentKey;
+      const s = p.step;
+      return `
+        <li class="pt-item${p.done ? ' done' : ''}${isCur ? ' current' : ''}">
+          <button class="pt-check" data-id="${escapeHtml(p.dish.id)}" data-si="${p.si}" aria-label="${p.done ? 'Undo' : 'Complete'} ${escapeHtml(s.label)}">${p.done ? '✓' : ''}</button>
+          <span class="pt-emoji">${escapeHtml(p.dish.emoji)}</span>
+          <span class="pt-text">
+            <b>${escapeHtml(s.label)}${s.shareCount > 1 ? ` <span class="ahead-tag shared-tag">shared ×${s.shareCount}</span>` : ''}</b>
+            <small>${escapeHtml(p.dish.name)}${isCur && s.note ? ` · <span class="pt-note">📝 ${escapeHtml(s.note)}</span>` : ''}</small>
+          </span>
+        </li>`;
+    }).join('');
     el.hero.innerHTML = `
       <div class="hero-top">
         <span class="hero-label">🔪 Prep — do any time</span>
         <span class="hero-clock">${prog.prepDone}/${prog.prepTotal} prep done</span>
       </div>
-      <div class="action">
-        <span class="action-emoji">${escapeHtml(cur.dish.emoji)}</span>
-        <div class="action-text">
-          <strong>${escapeHtml(s.label)}${s.shareCount > 1 ? ` <span class="ahead-tag shared-tag">shared ×${s.shareCount}</span>` : ''}</strong>
-          <small>${escapeHtml(cur.dish.name)}</small>
-          ${s.note ? `<small class="ns-note">📝 ${escapeHtml(s.note)}</small>` : ''}
-        </div>
-        <span class="action-count prep">~${fmtLen(s.lenMs)}</span>
-      </div>
-      <button class="btn primary big" id="done-btn">✓ Tap when complete</button>
-      ${rest.length ? `<ul class="prep-list">${restHtml}</ul>` : ''}
+      <ul class="prep-todo">${items}</ul>
       ${controls}`;
-    el.hero.querySelector('#done-btn').addEventListener('click', () => markDone(cur.dish.id, s.si));
   } else {
-    // No prep pending — top card is slim; follow the timeline below.
+    // No prep tasks in this meal — slim top card.
     el.hero.innerHTML = `
       <div class="hero-top">
-        <span class="hero-label">${paused ? 'Paused' : (prog.prepTotal ? '✓ Prep done' : 'Cooking')}</span>
+        <span class="hero-label">${paused ? 'Paused' : 'Cooking'}</span>
         <span class="hero-clock">${prog.doneCount}/${prog.totalSteps} done</span>
       </div>
-      <div class="prep-empty">${prog.prepTotal ? '✓ All prep done' : 'No prep tasks'} — follow the timeline below ↓</div>
+      <div class="prep-empty">No prep tasks — follow the timeline below ↓</div>
       ${controls}`;
   }
 
@@ -534,7 +545,10 @@ function renderGantt(prog) {
       const prefix = done ? '✓ ' : (s.state === 'shared-done' ? '✓ ' : (s.state === 'shared' ? '↔ ' : ''));
       const label = isShared ? `${prefix}shared` : `${prefix}${escapeHtml(s.label)}`;
       const tip = isShared ? `${escapeHtml(s.label)} — shared, done once by another dish` : `${escapeHtml(s.label)} · ${fmtLen(s.lenMs)}${s.note ? ' — ' + escapeHtml(s.note) : ''}`;
-      return `<div class="${cls}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${tip}">${wideEnough ? `<span>${label}</span>` : ''}</div>`;
+      // Every step carries a small info dot; tapping the block shows its details.
+      const info = `<span class="seg-i" aria-hidden="true">ⓘ</span>`;
+      const inner = wideEnough ? `<span class="seg-label">${label}</span>${info}` : info;
+      return `<div class="${cls}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${tip}">${inner}</div>`;
     }).join('');
 
     const geCls = `ge${run.started && prepSteps.length ? (prepAllDone ? ' prep-ready' : ' prep-pending') : ''}`;
@@ -735,10 +749,10 @@ el.addDish.addEventListener('click', () => {
   draft.dishes.push({ id: uid(), name: 'New dish', emoji: '🍽️', steps: [{ label: 'Step', minutes: 5, note: '' }] });
   renderEditor();
 });
-// Prep checklist: tap a row's ✓ to complete it. Also the timed-task Done button.
+// Prep to-do list: tap a row's checkbox to toggle it complete.
 el.hero.addEventListener('click', (e) => {
-  const pl = e.target.closest('.pl-done');
-  if (pl) { markDone(pl.dataset.id, +pl.dataset.si); return; }
+  const pt = e.target.closest('.pt-check');
+  if (pt) { toggleStepDone(pt.dataset.id, +pt.dataset.si); return; }
 });
 el.gantt.addEventListener('click', (e) => {
   const td = e.target.closest('#timed-done');

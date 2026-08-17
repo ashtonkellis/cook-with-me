@@ -156,27 +156,42 @@ main {
 .btn.big { width: 100%; padding: 15px; font-size: 1.1rem; margin-bottom: 10px; }
 .action-count.prep { color: var(--muted); font-size: 1rem; font-weight: 700; }
 
-/* Prep checklist (remaining prep tasks under the current one) */
-.prep-list {
-  list-style: none; margin: 0 0 10px; padding: 6px 0 0;
+/* Prep to-do list — all prep tasks (done + pending) in cook order */
+.prep-todo {
+  list-style: none; margin: 6px 0 10px; padding: 0;
   display: flex; flex-direction: column; gap: 6px;
-  max-height: 22vh; overflow-y: auto;
-  border-top: 1px solid var(--line);
+  max-height: 42vh; overflow-y: auto;
 }
-.prep-list li {
+.pt-item {
   display: flex; align-items: center; gap: 10px;
-  padding: 7px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.04);
+  padding: 8px 10px; border-radius: 11px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
 }
-.pl-emoji { font-size: 1.1rem; flex: none; }
-.pl-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
-.pl-text b { font-size: 0.9rem; }
-.pl-text small { color: var(--muted); font-size: 0.75rem; }
-.pl-done {
-  flex: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
-  border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06);
-  color: var(--done); font-size: 1rem; font-weight: 900;
+.pt-item.current {
+  background: rgba(252, 166, 2, 0.10);
+  border-color: rgba(252, 166, 2, 0.45);
 }
-.pl-done:active { transform: scale(0.94); }
+.pt-item.done { opacity: 0.6; }
+.pt-item.done .pt-text b { text-decoration: line-through; text-decoration-color: var(--muted); }
+.pt-check {
+  flex: none; width: 26px; height: 26px; border-radius: 7px; cursor: pointer;
+  border: 2px solid var(--muted); background: transparent;
+  color: #05261a; font-size: 0.9rem; font-weight: 900; line-height: 1;
+  display: grid; place-items: center;
+}
+.pt-item.done .pt-check { background: var(--done); border-color: var(--done); }
+.pt-item.current .pt-check { border-color: var(--active); }
+.pt-check:active { transform: scale(0.92); }
+.pt-emoji {
+  flex: none; font-size: 1.15rem; width: 32px; height: 32px;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 9px;
+}
+.pt-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.pt-text b { font-size: 0.95rem; }
+.pt-text small { color: var(--muted); font-size: 0.78rem; }
+.pt-note { color: var(--ink); opacity: 0.85; }
 .prep-empty { color: var(--muted); font-size: 0.95rem; margin: 8px 0 12px; }
 
 /* Timed action bar in the Gantt card */
@@ -246,8 +261,8 @@ main {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-evenly;
-  gap: 9px;
+  justify-content: center;   /* compact: pack the lanes rather than spread them */
+  gap: 6px;
   padding: 2px 0;
   overflow-y: auto;
 }
@@ -256,15 +271,15 @@ main {
   grid-template-columns: var(--label-w) 1fr;
   column-gap: var(--gap);
   align-items: center;
-  min-height: 44px;
+  min-height: 30px;
   flex: none;
 }
 .gantt-row.excluded { opacity: 0.5; }
 .gantt-label { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .gantt-label .ge {
-  font-size: 1.05rem; width: 26px; height: 26px; flex: none;
+  font-size: 1rem; width: 24px; height: 24px; flex: none;
   display: grid; place-items: center;
-  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 7px;
 }
 .dish-check {
   flex: none; width: 22px; height: 22px; padding: 0;
@@ -292,23 +307,28 @@ main {
 
 .gantt-track {
   position: relative;
-  height: 40px;
+  height: 30px;
   background: var(--track);
-  border-radius: 9px;
+  border-radius: 8px;
   overflow: hidden;
 }
 .gseg {
   position: absolute; top: 0; bottom: 0;
   border-radius: 7px;
-  display: flex; align-items: center;
-  padding: 0 7px;
+  display: flex; align-items: center; gap: 3px;
+  padding: 0 5px;
   overflow: hidden;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
   z-index: 1;
 }
-.gseg span {
-  font-size: 0.68rem; font-weight: 700; color: #0a1a2e;
+.gseg .seg-label {
+  flex: 1; min-width: 0;
+  font-size: 0.66rem; font-weight: 700; color: #0a1a2e;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gseg .seg-i {
+  flex: none; margin-left: auto;
+  font-size: 0.72rem; color: #0a1a2e; opacity: 0.75;
 }
 .gseg.active { z-index: 3; box-shadow: 0 0 0 2px rgba(255,255,255,0.6), 0 0 12px 1px hsl(var(--hue) 90% 60% / 0.55); }
 .gseg.done { filter: saturate(0.55) brightness(0.72); }

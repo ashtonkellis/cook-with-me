@@ -6,26 +6,25 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Todo
 
-- [ ] Reorder dishes / steps in the editor
-- [ ] Multiple saved meals (pick from a list)
+- (nothing outstanding)
 
 ## In Progress
 
 - (nothing)
 
-## Recently added workflows (see CLAUDE.md)
+## Backlog / ideas (not scheduled — don't gate deploys)
 
-- Versioning: `version.js` is the single source; UI footer shows it; bump on
-  every deploy; tell the user which version to expect after deploying.
-- Deploy: push to `main` → auto-deploys to GitHub Pages (user authorized
-  pushing to main).
-
-## In Progress
-
-- (nothing — core is done)
+- [ ] Reorder dishes / steps in the editor
+- [ ] Multiple saved meals (pick from a list)
+- [ ] Optional fast "test meal" for quick end-to-end testing
 
 ## Done
 
+- [x] **Prep to-do list + compressed Gantt + step info icons** — the top card
+      now lists ALL prep tasks (done + pending) as a checklist in cook order,
+      current item highlighted with its note; the Gantt is vertically compressed
+      (shorter, packed lanes); every timed step shows an ⓘ icon and tapping a
+      block reveals its details in the header.
 - [x] **Trim to 3 dishes** — BBQ chicken (prep & season = prep; preheat/side1/side2
       = timed), Rice (cook = timed; measure/wash + setup = prep), Stir-fried
       veggies (prep = prep; preheat pan + cook = timed). All selected by default.

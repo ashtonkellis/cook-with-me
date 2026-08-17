@@ -25,12 +25,18 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
 
 ### Deployment workflow
 - The user has authorized pushing directly to `main`.
+- **Only deploy (push to `main`) when the TODO **Todo** and **In Progress**
+  sections are EMPTY** — i.e. all outstanding requests are done. Don't push
+  after every individual change; batch the work and deploy once the list is
+  clear. Commit locally as you go (fine to commit to the working branch), but
+  hold the `main` push + version bump until the list is empty. The
+  **Backlog / ideas** section holds unscheduled ideas and does NOT gate deploys.
 - Pushing to `main` triggers `.github/workflows/deploy.yml`, which publishes the
   repo root to GitHub Pages at `https://ashtonkellis.github.io/cook-with-me/`.
 - One-time GitHub setup (only the user can do it): repo **Settings → Pages →
   Source = "GitHub Actions"**.
-- Deploy flow: bump `version.js` → commit → push `main` → tell the user the
-  version to expect.
+- Deploy flow (when the list is empty): bump `version.js` **once** → commit →
+  push `main` → tell the user the version to expect.
 
 ### Testing before deploy
 - `tools/smoke.mjs` is a headless Playwright smoke test (scheduling, next-step,
