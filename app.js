@@ -63,6 +63,7 @@ const el = {
   gantt: document.getElementById('gantt'),
   resetExample: document.getElementById('reset-example'),
   editBtn: document.getElementById('edit-btn'),
+  chooseTop: document.getElementById('choose-top'),
   editor: document.getElementById('editor'),
   editorDishes: document.getElementById('editor-dishes'),
   editorClose: document.getElementById('editor-close'),
@@ -287,8 +288,39 @@ function markDone(dishId, si) {
   run.doneSteps = run.doneSteps || {};
   run.doneSteps[stepKey(dishId, si)] = elapsedMs();
   if ('vibrate' in navigator) navigator.vibrate(30);
+  maybeJumpAhead(); // if only one dish is left, skip the idle wait
   saveRun();
   refresh();
+}
+
+// Set the elapsed clock to a target (ms), keeping pause state consistent.
+function setElapsed(targetMs) {
+  const target = Math.max(0, targetMs);
+  if (run.runningSince != null) run.accumMs = target - (Date.now() - run.runningSince);
+  else run.accumMs = target;
+}
+// Rewind / fast-forward the timed clock by a delta (ms).
+function nudgeClock(deltaMs) {
+  if (!run.started) return;
+  setElapsed(elapsedMs() + deltaMs);
+  if ('vibrate' in navigator) navigator.vibrate(15);
+  saveRun();
+  refresh();
+}
+// When only ONE dish still has unfinished timed steps, there's nothing to keep
+// in sync — so completing a step early jumps the clock to that dish's next step
+// instead of idling.
+function maybeJumpAhead() {
+  const prog = computeProgress();
+  const remaining = prog.dishes.filter((d) => d.included && d.steps &&
+    d.steps.some((s) => !s.prep && !s.redundant && s.state !== 'done' && s.state !== 'shared-done'));
+  if (remaining.length !== 1) return;
+  let soonest = null;
+  for (const s of remaining[0].steps) {
+    if (s.prep || s.redundant || s.state !== 'waiting') continue;
+    if (soonest == null || s.projStart < soonest) soonest = s.projStart;
+  }
+  if (soonest != null && soonest > prog.elapsed) setElapsed(soonest);
 }
 // Toggle completion (used by prep checkboxes). Prep can be done ANY time — even
 // before "Start cooking" — so this doesn't require the timed clock to be running.
@@ -440,11 +472,16 @@ function renderHero(prog) {
         </span>
       </li>`;
   }).join('');
+  const allPrepDone = prog.prepTotal > 0 && prog.prepDone === prog.prepTotal;
+  const banner = allPrepDone
+    ? `<div class="prep-done-banner">✅ All prep done — ready to cook!${run.started ? '' : ' Tap ▶ Start cooking below.'}</div>`
+    : '';
   el.hero.innerHTML = `
     <div class="hero-top">
       <span class="hero-label">🔪 Prep — do any time</span>
       <span class="hero-clock">${prog.prepDone}/${prog.prepTotal} prep done</span>
     </div>
+    ${banner}
     <ul class="prep-todo">${items}</ul>`;
 }
 
@@ -477,13 +514,13 @@ function renderGantt(prog) {
     // dish's prep is all done).
     const prepSteps = d.steps.filter((s) => s.prep && !s.redundant);
     const prepDoneN = prepSteps.filter((s) => s.state === 'done' || s.state === 'shared-done').length;
-    const prepAllDone = prepSteps.length > 0 && prepDoneN === prepSteps.length;
-    let prepBadge = '';
-    if (prepSteps.length) {
-      if (prepAllDone) prepBadge = `<span class="lane-prep done">✓ prep ready</span>`;
-      else if (prepDoneN > 0) prepBadge = `<span class="lane-prep pending">🔪 ${prepSteps.length - prepDoneN} prep left</span>`;
-      else prepBadge = `<span class="lane-prep">🔪 ${prepSteps.length} prep</span>`;
-    }
+    // A dish is "prep ready" when all its prep is done — including dishes that
+    // have NO prep steps at all (nothing to prep → ready to cook).
+    const prepReady = prepDoneN === prepSteps.length;
+    let prepBadge;
+    if (prepReady) prepBadge = `<span class="lane-prep done">${prepSteps.length ? '✓ prep ready' : '✓ no prep'}</span>`;
+    else if (prepDoneN > 0) prepBadge = `<span class="lane-prep pending">🔪 ${prepSteps.length - prepDoneN} prep left</span>`;
+    else prepBadge = `<span class="lane-prep">🔪 ${prepSteps.length} prep</span>`;
 
     // Per-dish status shown in the label gutter (timed steps only).
     let status, statusCls;
@@ -518,9 +555,9 @@ function renderGantt(prog) {
       return `<div class="${cls}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${tip}">${inner}</div>`;
     }).join('');
 
-    const geCls = `ge${prepSteps.length ? (prepAllDone ? ' prep-ready' : ' prep-pending') : ''}`;
+    const geCls = `ge${prepReady ? ' prep-ready' : ' prep-pending'}`;
     return `
-      <div class="gantt-row${prepAllDone ? ' prep-ready' : ''}">
+      <div class="gantt-row${prepReady ? ' prep-ready' : ''}">
         <div class="gantt-label">
           <span class="${geCls}">${escapeHtml(d.emoji)}</span>
           <span class="gtxt"><span class="gn">${escapeHtml(d.name)}</span><span class="gs ${statusCls}">${status}</span>${prepBadge}</span>
@@ -536,13 +573,27 @@ function renderGantt(prog) {
        </div>`
     : '';
 
-  // Detail line: the tapped step's note (or a hint).
-  let detail = `<span class="gantt-sub">${picking ? 'your chosen dishes · all finish together →' : 'tap a block for its note'}</span>`;
+  // Calculated done time = projected clock time the whole meal is ready.
+  const remainingMs = Math.max(0, prog.timelineMs - elapsed);
+  const doneClock = fmtClock(Date.now() + remainingMs);
+
+  // Detail line: the tapped step's note, else the calculated done time.
+  let detail = `<span class="gantt-sub">🍽️ ready ~${doneClock}${run.started ? '' : ' (if you start now)'}</span>`;
   if (selected) {
     const sd = schedule.dishes[selected.di];
     const ss = sd && sd.steps[selected.si];
     if (ss) {
       detail = `<span class="gantt-detail">${escapeHtml(sd.emoji)} <b>${escapeHtml(ss.label)}</b> · ${fmtLen(ss.lenMs || (ss.minutes * MIN))}${ss.note ? ` — 📝 ${escapeHtml(ss.note)}` : ' — no note'}</span>`;
+    }
+  }
+
+  // The next timed step to begin (soonest waiting), for the countdown.
+  let nextUp = null;
+  for (const d of prog.dishes) {
+    if (!d.included || !d.steps) continue;
+    for (const st of d.steps) {
+      if (st.prep || st.redundant || st.state !== 'waiting') continue;
+      if (!nextUp || st.projStart < nextUp.step.projStart) nextUp = { dish: d, step: st };
     }
   }
 
@@ -554,21 +605,18 @@ function renderGantt(prog) {
       const s = ta.step;
       const remain = s.projEnd - elapsed;
       const over = remain <= 0;
+      const nextLine = nextUp
+        ? `<div class="timed-next">⏭ Next: <b>${escapeHtml(nextUp.step.label)}</b> (${escapeHtml(nextUp.dish.name)}) in <span class="tn-count">${fmtDur(Math.max(0, nextUp.step.projStart - elapsed))}</span></div>`
+        : '';
       bar = `<div class="timed-now go">
         <span class="tn-emoji">${escapeHtml(ta.dish.emoji)}</span>
         <span class="tn-text"><b>${escapeHtml(s.label)}${s.shareCount > 1 ? ` <span class="ahead-tag shared-tag">shared ×${s.shareCount}</span>` : ''}</b><small>${escapeHtml(ta.dish.name)}</small></span>
         <span class="tn-count${over ? ' over' : ''}">${over ? 'go' : fmtDur(remain)}</span>
         <button class="btn primary tn-done" id="timed-done" data-id="${escapeHtml(ta.dish.id)}" data-si="${s.si}">✓ Done</button>
-      </div>`;
+      </div>${nextLine}`;
     } else {
-      let soonest = null;
-      for (const d of prog.dishes) {
-        if (!d.included || !d.steps) continue;
-        const nx = d.steps.find((st) => !st.prep && st.state === 'waiting');
-        if (nx && (!soonest || nx.projStart < soonest.step.projStart)) soonest = { dish: d, step: nx };
-      }
-      bar = soonest
-        ? `<div class="timed-now wait">⏳ Next timed task is <b>${escapeHtml(soonest.step.label)}</b> (${escapeHtml(soonest.dish.name)}) in <span class="tn-count">${fmtDur(Math.max(0, soonest.step.projStart - elapsed))}</span></div>`
+      bar = nextUp
+        ? `<div class="timed-now wait">⏳ Next timed task is <b>${escapeHtml(nextUp.step.label)}</b> (${escapeHtml(nextUp.dish.name)}) in <span class="tn-count">${fmtDur(Math.max(0, nextUp.step.projStart - elapsed))}</span></div>`
         : `<div class="timed-now alldone">✓ All timed tasks done</div>`;
     }
   }
@@ -589,8 +637,10 @@ function renderGantt(prog) {
   } else {
     cookBar = `${bar}
       <div class="cook-controls">
+        <button class="btn ghost sm" id="rew-btn" aria-label="Rewind 15 seconds">⏪ 15s</button>
         <button class="btn ${paused ? 'primary' : 'warn'}" id="pp-btn">${paused ? '▶ Resume' : '⏸ Pause'}</button>
         <button class="btn ghost" id="reset-btn">Reset</button>
+        <button class="btn ghost sm" id="ff-btn" aria-label="Fast-forward 15 seconds">15s ⏩</button>
       </div>`;
   }
 
@@ -747,6 +797,8 @@ el.gantt.addEventListener('click', (e) => {
   if (td) { markDone(td.dataset.id, +td.dataset.si); return; }
   if (e.target.closest('#choose-btn') || e.target.closest('#gantt-choose')) { openPicker(); return; }
   if (e.target.closest('#start-btn')) { startMeal(); return; }
+  if (e.target.closest('#rew-btn')) { nudgeClock(-15000); return; }
+  if (e.target.closest('#ff-btn')) { nudgeClock(15000); return; }
   if (e.target.closest('#pp-btn')) { isRunning() ? pauseMeal() : resumeMeal(); return; }
   if (e.target.closest('#reset-btn')) {
     if (isAllDone() || confirm('Reset the whole meal timer?')) resetMeal();
@@ -760,6 +812,7 @@ el.gantt.addEventListener('click', (e) => {
 });
 
 el.editBtn.addEventListener('click', openEditor);
+el.chooseTop.addEventListener('click', openPicker);
 el.editorClose.addEventListener('click', closeEditor);
 el.editorCancel.addEventListener('click', closeEditor);
 el.editorSave.addEventListener('click', saveEditor);

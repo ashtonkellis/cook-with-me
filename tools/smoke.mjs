@@ -16,6 +16,9 @@ console.log('version shown:', (await page.textContent('#version')).trim());
 console.log('picker at startup:', await page.isVisible('#picker .editor-panel'),
   '| dishes:', await page.$$eval('.pick-row', (n) => n.length),
   '| selected:', await page.$$eval('.pick-row.on', (n) => n.length));
+// Toggle a dish off/on to persist the meal to localStorage (for later evals).
+await page.click('.pick-row:first-child'); await page.waitForTimeout(60);
+await page.click('.pick-row:first-child'); await page.waitForTimeout(60);
 await page.click('#picker-done');
 await page.waitForTimeout(150);
 
@@ -45,7 +48,14 @@ let clicks = 0;
 while ((await page.$('.pt-item:not(.done) .pt-check')) && clicks < 8) {
   await page.click('.pt-item:not(.done) .pt-check'); await page.waitForTimeout(70); clicks++;
 }
-console.log('all prep done -> prep-ready lanes (expect 3):', await page.$$eval('.gantt-row.prep-ready', (n) => n.length));
+console.log('all prep done -> prep-ready lanes (expect 3):', await page.$$eval('.gantt-row.prep-ready', (n) => n.length),
+  '| prep-done banner:', !!(await page.$('.prep-done-banner')));
+// Calculated done time is shown.
+console.log('done-time shown:', (await page.$eval('.gantt-sub', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim());
+// Header "choose dishes" icon opens the picker.
+await page.click('#choose-top'); await page.waitForTimeout(150);
+console.log('header choose-dishes opens picker:', await page.isVisible('#picker .editor-panel'));
+await page.click('#picker-done'); await page.waitForTimeout(120);
 await page.screenshot({ path: 'tools/shot-prep.png' });
 
 // Every timed step has an info icon; dishes finish together.
@@ -64,6 +74,14 @@ console.log('after start -> now-line:', !!(await page.$('.gantt-nowline')),
   '| pause btn:', !!(await page.$('#pp-btn')));
 const scroll2 = await page.evaluate(() => ({ s: document.body.scrollHeight, c: document.documentElement.clientHeight }));
 console.log('cooking no-scroll:', scroll2.s <= scroll2.c + 1 ? 'FITS' : `SCROLLS (${scroll2.s}>${scroll2.c})`);
+// Countdown to the next step + rewind/ff buttons.
+console.log('next-step countdown:', (await page.$eval('.timed-next', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim(),
+  '| rewind+ff btns:', !!(await page.$('#rew-btn')) && !!(await page.$('#ff-btn')));
+// Fast-forward 15s advances the now-line.
+const before = await page.$eval('.now-flag', (n) => n.textContent).catch(() => '?');
+await page.click('#ff-btn'); await page.waitForTimeout(120);
+const after = await page.$eval('.now-flag', (n) => n.textContent).catch(() => '?');
+console.log('fast-forward 15s:', before, '->', after);
 await page.screenshot({ path: 'tools/shot-running.png' });
 
 // Tap a step block -> details in the header.
@@ -86,6 +104,37 @@ await page.click('#edit-btn');
 await page.waitForTimeout(200);
 console.log('editor dishes:', await page.$$eval('.ed-dish', (n) => n.length), '| prep toggles:', (await page.$$eval('.ed-step-prep-cb', (n) => n.length)) > 0);
 await page.click('#editor-close');
+
+// No-prep dish -> marked prep-ready. Give rice an all-timed set of steps.
+await page.evaluate(() => {
+  const m = JSON.parse(localStorage.getItem('cook-with-me:meal'));
+  const rice = m.dishes.find((d) => d.id === 'rice');
+  rice.steps.forEach((s) => { delete s.prep; });
+  for (const d of m.dishes) d.included = (d.id === 'rice');
+  localStorage.setItem('cook-with-me:meal', JSON.stringify(m));
+  localStorage.setItem('cook-with-me:run', JSON.stringify({ started: false, runningSince: null, accumMs: 0, doneSteps: {} }));
+});
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(200);
+await page.click('#picker-done').catch(() => {});
+await page.waitForTimeout(120);
+console.log('no-prep dish prep-ready:', await page.$$eval('.gantt-row.prep-ready', (n) => n.length), '(expect 1, rice)');
+
+// Jump-ahead: single dish, start, complete first timed step early -> clock jumps.
+await page.click('#start-btn'); await page.waitForTimeout(300);
+const flagBefore = await page.$eval('.now-flag', (n) => n.textContent).catch(() => '?');
+await page.click('#timed-done'); await page.waitForTimeout(200);
+const flagAfter = await page.$eval('.now-flag', (n) => n.textContent).catch(() => '?');
+console.log('jump-ahead (1 dish) clock:', flagBefore, '->', flagAfter, '(should jump forward)');
+
+// Reset the default meal for a clean state.
+await page.evaluate(() => {
+  const m = JSON.parse(localStorage.getItem('cook-with-me:meal'));
+  const rice = m.dishes.find((d) => d.id === 'rice');
+  rice.steps[0].prep = true; rice.steps[1].prep = true;
+  for (const d of m.dishes) d.included = true;
+  localStorage.setItem('cook-with-me:meal', JSON.stringify(m));
+});
 
 // Done state.
 await page.evaluate(() => {

@@ -20,6 +20,12 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Cooking-flow batch (V18)** — dishes with no prep count as prep-ready
+      (green); "Choose dishes" moved to a header icon; calculated done time
+      ("ready ~7:51 PM"); countdown to the next step while cooking; tapping Done
+      when only one dish remains jumps the clock to that dish's next step;
+      ⏪ 15s / ⏩ 15s buttons next to Pause/Reset; "all prep done — ready to
+      cook!" banner in the prep section.
 - [x] **Two-section layout: prep on top, cooking on the bottom** — TOP is the
       prep to-do list (all prep tasks, doable any time — even before cooking);
       BOTTOM holds the "Start cooking" button, the timed action bar / Pause /
