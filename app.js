@@ -268,9 +268,11 @@ function computeProgress() {
   timedActions.sort((a, b) => a.step.projStart - b.step.projStart);
   // Prep tasks are ordered by when their dish's timed cooking begins — so the
   // prep for the dish that starts cooking first is first in the list.
-  const byCookOrder = (a, b) => (a.dish.startMs - b.dish.startMs) || (a.di - b.di) || (a.si - b.si);
-  prepPending.sort(byCookOrder);
-  prepAll.sort(byCookOrder);
+  // Prep to-do list order matches the order dishes appear in the Gantt (row/di
+  // order), then step order within a dish.
+  const byGanttOrder = (a, b) => (a.di - b.di) || (a.si - b.si);
+  prepPending.sort(byGanttOrder);
+  prepAll.sort(byGanttOrder);
   const totalSteps = prepTotal + timedTotal;
   const doneCount = prepDone + timedDone;
   return {
@@ -288,9 +290,10 @@ function markDone(dishId, si) {
   saveRun();
   refresh();
 }
-// Toggle completion (used by prep checkboxes so a mistaken tap can be undone).
+// Toggle completion (used by prep checkboxes). Prep can be done ANY time — even
+// before "Start cooking" — so this doesn't require the timed clock to be running.
 function toggleStepDone(dishId, si) {
-  if (!run.started) return;
+  if (!schedule.includedCount) return;
   run.doneSteps = run.doneSteps || {};
   const k = stepKey(dishId, si);
   if (k in run.doneSteps) delete run.doneSteps[k];
@@ -300,11 +303,15 @@ function toggleStepDone(dishId, si) {
   refresh();
 }
 
+// "Start cooking" begins the TIMED clock. Prep already ticked off is preserved.
 function startMeal() {
   if (!schedule.includedCount) return; // nothing selected
   primeAudio();
   requestNotifyPermission();
-  run = { started: true, runningSince: Date.now(), accumMs: 0, doneSteps: {} };
+  run.started = true;
+  run.runningSince = Date.now();
+  run.accumMs = 0;
+  run.doneSteps = run.doneSteps || {};
   lastActiveKeys = new Set();
   mealDoneNotified = false;
   saveRun();
@@ -401,84 +408,44 @@ function loadRun() {
 }
 
 // ---------- Rendering ----------
+// TOP card = PREP to-do list only (untimed tasks, doable any time — even before
+// "Start cooking"). Cooking controls + timeline live in the BOTTOM (Gantt) card.
 function renderHero(prog) {
-  if (!run.started) {
-    const n = schedule.includedCount;
-    const none = n === 0;
+  if (!schedule.includedCount) {
     el.hero.innerHTML = `
-      <div class="hero-top">
-        <span class="hero-label">Ready to cook</span>
-        <span class="hero-clock">${none ? 'no dishes chosen' : `${n} dish${n === 1 ? '' : 'es'} · ~${fmtLen(schedule.mealMs)}`}</span>
-      </div>
-      <div class="hero-time">${none ? '—' : fmtDur(schedule.mealMs)}</div>
-      <div class="controls">
-        <button class="btn ghost" id="choose-btn">🍽️ Choose dishes</button>
-        <button class="btn primary" id="start-btn"${none ? ' disabled' : ''}>▶ Start meal</button>
-      </div>`;
-    el.hero.querySelector('#choose-btn').addEventListener('click', openPicker);
-    const btn = el.hero.querySelector('#start-btn');
-    if (!none) btn.addEventListener('click', startMeal);
+      <div class="hero-top"><span class="hero-label">🔪 Prep</span></div>
+      <div class="prep-empty">No dishes chosen yet — pick some below.</div>`;
     return;
   }
-
-  if (prog.allDone) {
-    el.hero.innerHTML = `
-      <div class="hero-top"><span class="hero-label">Meal complete</span></div>
-      <div class="hero-time">🍽️ Ready!</div>
-      <div class="controls">
-        <button class="btn ghost" id="reset-btn">Start over</button>
-      </div>`;
-    el.hero.querySelector('#reset-btn').addEventListener('click', resetMeal);
-    return;
-  }
-
-  // Top card = PREP tasks (untimed, do any time). Timed tasks live in the Gantt.
-  const paused = !isRunning();
-  const controls = `
-    <div class="controls">
-      <button class="btn ${paused ? 'primary' : 'warn'}" id="pp-btn">${paused ? '▶ Resume' : '⏸ Pause'}</button>
-      <button class="btn ghost" id="reset-btn">Reset</button>
-    </div>`;
 
   const prepAll = prog.prepAll || [];
-  const currentKey = prog.prepPending[0] ? prog.prepPending[0].key : null;
-  if (prepAll.length) {
-    // Full to-do list of every prep task (done + pending), in cook order.
-    const items = prepAll.map((p) => {
-      const isCur = p.key === currentKey;
-      const s = p.step;
-      return `
-        <li class="pt-item${p.done ? ' done' : ''}${isCur ? ' current' : ''}">
-          <button class="pt-check" data-id="${escapeHtml(p.dish.id)}" data-si="${p.si}" aria-label="${p.done ? 'Undo' : 'Complete'} ${escapeHtml(s.label)}">${p.done ? '✓' : ''}</button>
-          <span class="pt-emoji">${escapeHtml(p.dish.emoji)}</span>
-          <span class="pt-text">
-            <b>${escapeHtml(s.label)}${s.shareCount > 1 ? ` <span class="ahead-tag shared-tag">shared ×${s.shareCount}</span>` : ''}</b>
-            <small>${escapeHtml(p.dish.name)}${isCur && s.note ? ` · <span class="pt-note">📝 ${escapeHtml(s.note)}</span>` : ''}</small>
-          </span>
-        </li>`;
-    }).join('');
+  if (!prepAll.length) {
     el.hero.innerHTML = `
-      <div class="hero-top">
-        <span class="hero-label">🔪 Prep — do any time</span>
-        <span class="hero-clock">${prog.prepDone}/${prog.prepTotal} prep done</span>
-      </div>
-      <ul class="prep-todo">${items}</ul>
-      ${controls}`;
-  } else {
-    // No prep tasks in this meal — slim top card.
-    el.hero.innerHTML = `
-      <div class="hero-top">
-        <span class="hero-label">${paused ? 'Paused' : 'Cooking'}</span>
-        <span class="hero-clock">${prog.doneCount}/${prog.totalSteps} done</span>
-      </div>
-      <div class="prep-empty">No prep tasks — follow the timeline below ↓</div>
-      ${controls}`;
+      <div class="hero-top"><span class="hero-label">🔪 Prep</span><span class="hero-clock">no prep needed</span></div>
+      <div class="prep-empty">No prep tasks — start cooking below ↓</div>`;
+    return;
   }
 
-  el.hero.querySelector('#pp-btn').addEventListener('click', paused ? resumeMeal : pauseMeal);
-  el.hero.querySelector('#reset-btn').addEventListener('click', () => {
-    if (confirm('Reset the whole meal timer?')) resetMeal();
-  });
+  const currentKey = prog.prepPending[0] ? prog.prepPending[0].key : null;
+  const items = prepAll.map((p) => {
+    const isCur = p.key === currentKey;
+    const s = p.step;
+    return `
+      <li class="pt-item${p.done ? ' done' : ''}${isCur ? ' current' : ''}">
+        <button class="pt-check" data-id="${escapeHtml(p.dish.id)}" data-si="${p.si}" aria-label="${p.done ? 'Undo' : 'Complete'} ${escapeHtml(s.label)}">${p.done ? '✓' : ''}</button>
+        <span class="pt-emoji">${escapeHtml(p.dish.emoji)}</span>
+        <span class="pt-text">
+          <b>${escapeHtml(s.label)}${s.shareCount > 1 ? ` <span class="ahead-tag shared-tag">shared ×${s.shareCount}</span>` : ''}</b>
+          <small>${escapeHtml(p.dish.name)}${isCur && s.note ? ` · <span class="pt-note">📝 ${escapeHtml(s.note)}</span>` : ''}</small>
+        </span>
+      </li>`;
+  }).join('');
+  el.hero.innerHTML = `
+    <div class="hero-top">
+      <span class="hero-label">🔪 Prep — do any time</span>
+      <span class="hero-clock">${prog.prepDone}/${prog.prepTotal} prep done</span>
+    </div>
+    <ul class="prep-todo">${items}</ul>`;
 }
 
 // Distinct hue per dish; steps within a dish graduate in lightness so each
@@ -513,9 +480,9 @@ function renderGantt(prog) {
     const prepAllDone = prepSteps.length > 0 && prepDoneN === prepSteps.length;
     let prepBadge = '';
     if (prepSteps.length) {
-      if (!run.started) prepBadge = `<span class="lane-prep">🔪 ${prepSteps.length} prep</span>`;
-      else if (prepAllDone) prepBadge = `<span class="lane-prep done">✓ prep ready</span>`;
-      else prepBadge = `<span class="lane-prep pending">🔪 ${prepSteps.length - prepDoneN} prep left</span>`;
+      if (prepAllDone) prepBadge = `<span class="lane-prep done">✓ prep ready</span>`;
+      else if (prepDoneN > 0) prepBadge = `<span class="lane-prep pending">🔪 ${prepSteps.length - prepDoneN} prep left</span>`;
+      else prepBadge = `<span class="lane-prep">🔪 ${prepSteps.length} prep</span>`;
     }
 
     // Per-dish status shown in the label gutter (timed steps only).
@@ -551,9 +518,9 @@ function renderGantt(prog) {
       return `<div class="${cls}" data-di="${di}" data-si="${si}" style="left:${left}%;width:${width}%;background:${stepColor(hue, si, d.steps.length)}" title="${tip}">${inner}</div>`;
     }).join('');
 
-    const geCls = `ge${run.started && prepSteps.length ? (prepAllDone ? ' prep-ready' : ' prep-pending') : ''}`;
+    const geCls = `ge${prepSteps.length ? (prepAllDone ? ' prep-ready' : ' prep-pending') : ''}`;
     return `
-      <div class="gantt-row">
+      <div class="gantt-row${prepAllDone ? ' prep-ready' : ''}">
         <div class="gantt-label">
           <span class="${geCls}">${escapeHtml(d.emoji)}</span>
           <span class="gtxt"><span class="gn">${escapeHtml(d.name)}</span><span class="gs ${statusCls}">${status}</span>${prepBadge}</span>
@@ -606,15 +573,36 @@ function renderGantt(prog) {
     }
   }
 
+  // Cooking controls live at the BOTTOM with the Gantt.
+  const paused = !isRunning();
+  let cookBar;
+  if (!schedule.includedCount) {
+    cookBar = `<div class="cook-controls"><button class="btn primary full" id="choose-btn">🍽️ Choose dishes</button></div>`;
+  } else if (!run.started) {
+    cookBar = `<div class="cook-controls">
+      <button class="btn ghost" id="choose-btn">🍽️ Choose dishes</button>
+      <button class="btn primary" id="start-btn">▶ Start cooking</button>
+    </div>`;
+  } else if (prog.allDone) {
+    cookBar = `<div class="timed-now alldone">🍽️ Meal ready — everything's done!</div>
+      <div class="cook-controls"><button class="btn ghost full" id="reset-btn">Start over</button></div>`;
+  } else {
+    cookBar = `${bar}
+      <div class="cook-controls">
+        <button class="btn ${paused ? 'primary' : 'warn'}" id="pp-btn">${paused ? '▶ Resume' : '⏸ Pause'}</button>
+        <button class="btn ghost" id="reset-btn">Reset</button>
+      </div>`;
+  }
+
   const total = fmtDur(scaleMs);
   el.gantt.innerHTML = `
     <div class="gantt-head">
       <span class="gantt-title">Meal timeline</span>
       ${detail}
     </div>
-    ${bar}
+    ${cookBar}
     <div class="gantt-rows">
-      ${rows || `<div class="gantt-empty">No dishes chosen yet.<br><button class="btn ghost" id="gantt-choose">🍽️ Choose dishes</button></div>`}
+      ${rows || `<div class="gantt-empty">Choose dishes to see the timeline.</div>`}
       ${nowLayer}
     </div>
     <div class="gantt-axis"><span>0:00</span><span class="ax-end">serve · ${total}</span></div>`;
@@ -757,7 +745,13 @@ el.hero.addEventListener('click', (e) => {
 el.gantt.addEventListener('click', (e) => {
   const td = e.target.closest('#timed-done');
   if (td) { markDone(td.dataset.id, +td.dataset.si); return; }
-  if (e.target.closest('#gantt-choose')) { openPicker(); return; }
+  if (e.target.closest('#choose-btn') || e.target.closest('#gantt-choose')) { openPicker(); return; }
+  if (e.target.closest('#start-btn')) { startMeal(); return; }
+  if (e.target.closest('#pp-btn')) { isRunning() ? pauseMeal() : resumeMeal(); return; }
+  if (e.target.closest('#reset-btn')) {
+    if (isAllDone() || confirm('Reset the whole meal timer?')) resetMeal();
+    return;
+  }
   const seg = e.target.closest('.gseg');
   if (!seg) return;
   const di = +seg.dataset.di, si = +seg.dataset.si;

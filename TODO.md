@@ -20,6 +20,12 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Two-section layout: prep on top, cooking on the bottom** — TOP is the
+      prep to-do list (all prep tasks, doable any time — even before cooking);
+      BOTTOM holds the "Start cooking" button, the timed action bar / Pause /
+      Reset, and the Gantt. Prep list sorts in Gantt/dish order. When all of a
+      dish's prep is done, that dish turns green in the Gantt (name, emoji ring,
+      track outline).
 - [x] **Prep to-do list + compressed Gantt + step info icons** — the top card
       now lists ALL prep tasks (done + pending) as a checklist in cook order,
       current item highlighted with its note; the Gantt is vertically compressed

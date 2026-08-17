@@ -131,6 +131,15 @@ main {
 .controls { display: flex; gap: 10px; }
 .controls .btn { padding: 9px 16px; font-size: 0.92rem; }
 
+/* Cooking controls (Start / Pause / Reset) live at the bottom with the Gantt */
+.cook-controls { flex: none; display: flex; gap: 10px; margin-bottom: 8px; }
+.cook-controls .btn { flex: 1; padding: 11px 16px; }
+.btn.full { width: 100%; flex: none; }
+
+/* A dish whose prep is all done turns green in the Gantt */
+.gantt-row.prep-ready .gn { color: var(--done); }
+.gantt-row.prep-ready .gantt-track { box-shadow: inset 0 0 0 1.5px rgba(55, 197, 123, 0.7); }
+
 /* ---- Guided action card ---- */
 .action {
   display: flex; align-items: center; gap: 12px;

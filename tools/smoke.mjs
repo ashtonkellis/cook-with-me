@@ -10,122 +10,92 @@ page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 
 await page.goto('http://localhost:8123/', { waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-
 console.log('version shown:', (await page.textContent('#version')).trim());
 
-// Picker launches at startup: 3 dishes, all selected.
-const pickerOpen = await page.isVisible('#picker .editor-panel');
-const pickRows = await page.$$eval('.pick-row', (n) => n.length);
-const pickOn = await page.$$eval('.pick-row.on', (n) => n.length);
-console.log('picker at startup:', pickerOpen, '| dishes (expect 3):', pickRows, '| selected (expect 3):', pickOn);
-await page.screenshot({ path: 'tools/shot-picker.png' });
-
-// Toggle one off then back on.
-await page.click('.pick-row:first-child');
-await page.waitForTimeout(100);
-console.log('after unchecking one -> selected:', await page.$$eval('.pick-row.on', (n) => n.length));
-await page.click('.pick-row:first-child');
-await page.waitForTimeout(80);
-
-// Close the picker.
+// Picker at startup: 3 dishes, all selected.
+console.log('picker at startup:', await page.isVisible('#picker .editor-panel'),
+  '| dishes:', await page.$$eval('.pick-row', (n) => n.length),
+  '| selected:', await page.$$eval('.pick-row.on', (n) => n.length));
 await page.click('#picker-done');
 await page.waitForTimeout(150);
-console.log('hero time (expect 21:00):', (await page.textContent('.hero-time')).trim());
-console.log('gantt lanes (expect 3):', await page.$$eval('.gantt-row', (n) => n.length));
 
-const scroll = await page.evaluate(() => ({
-  scrollH: document.body.scrollHeight, client: document.documentElement.clientHeight,
-}));
-console.log('idle no-scroll:', scroll.scrollH <= scroll.client + 1 ? 'FITS' : `SCROLLS (${scroll.scrollH}>${scroll.client})`);
+// BEFORE cooking: TOP = prep to-do list (all 4 prep tasks), in Gantt/dish order.
+const prepItems = await page.$$eval('.prep-todo .pt-item', (ns) => ns.length);
+const prepOrder = await page.$$eval('.prep-todo .pt-item .pt-text b', (ns) => ns.map((n) => n.textContent.trim()));
+console.log('prep to-do items before start (expect 4):', prepItems);
+console.log('prep order (dish order — chicken, rice, rice, veggies):', JSON.stringify(prepOrder));
 
-const ends = await page.$$eval('.gantt-row', (rows) => rows
-  .filter((r) => r.querySelector('.gseg'))
-  .map((r) => {
-    const segs = [...r.querySelectorAll('.gseg')];
-    const last = segs[segs.length - 1];
-    return Math.round((parseFloat(last.style.left) + parseFloat(last.style.width)) * 10) / 10;
-  }));
-console.log('dish end % (all 100):', JSON.stringify(ends),
-  '=>', ends.length === 3 && ends.every((e) => Math.abs(e - 100) < 0.5) ? 'ALL FINISH TOGETHER ✓' : 'CHECK');
+// BOTTOM: Start cooking button, no timed bar yet.
+console.log('start-cooking button present:', !!(await page.$('#start-btn')),
+  '| timed bar yet:', !!(await page.$('#timed-done')),
+  '| gantt lanes:', await page.$$eval('.gantt-row', (n) => n.length));
+
+const scroll1 = await page.evaluate(() => ({ s: document.body.scrollHeight, c: document.documentElement.clientHeight }));
+console.log('idle no-scroll:', scroll1.s <= scroll1.c + 1 ? 'FITS' : `SCROLLS (${scroll1.s}>${scroll1.c})`);
 await page.screenshot({ path: 'tools/shot-idle.png' });
 
-// Start.
-await page.click('#start-btn');
-await page.waitForTimeout(400);
-console.log('lanes running:', await page.$$eval('.gantt-row', (n) => n.length), '| now-line:', !!(await page.$('.gantt-nowline')));
-
-// Top = full prep to-do list (all 4 prep items). Order: chicken cooks first.
-const prepItems = await page.$$eval('.prep-todo .pt-item', (ns) => ns.length);
-const firstPrep = (await page.textContent('.prep-todo .pt-item.current .pt-text b')).trim();
-console.log('prep to-do items (expect 4):', prepItems, '| current (expect Prep & season chicken):', firstPrep);
-// Every timed step block carries an info icon.
-console.log('step info icons present:', await page.$$eval('.gseg .seg-i', (n) => n.length), '(should be > 0)');
-// Timed bar = current timed task (chicken Preheat BBQ).
-console.log('timed bar:', (await page.$eval('.timed-now', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim());
-// Every dish has prep -> 3 pending prep badges.
-console.log('lanes with prep-pending badge (expect 3):', await page.$$eval('.lane-prep.pending', (n) => n.length));
-
-const runScroll = await page.evaluate(() => ({
-  scrollH: document.body.scrollHeight, client: document.documentElement.clientHeight,
-}));
-console.log('running no-scroll:', runScroll.scrollH <= runScroll.client + 1 ? 'FITS' : `SCROLLS (${runScroll.scrollH}>${runScroll.client})`);
-await page.screenshot({ path: 'tools/shot-prep.png' });
-
-// Tap a step block -> its details show in the header detail line.
-await page.click('.gantt-row:first-child .gseg');
+// Prep can be done BEFORE cooking. Complete the first dish's prep -> its lane turns green.
+await page.click('.prep-todo .pt-item:first-child .pt-check');
 await page.waitForTimeout(120);
-console.log('tapped step detail:', (await page.$eval('.gantt-detail', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim());
+console.log('after prepping 1 dish (before cooking) -> prep-ready lanes:', await page.$$eval('.gantt-row.prep-ready', (n) => n.length),
+  '| still not cooking:', !(await page.$('#timed-done')));
 
-// Complete all 4 prep tasks via the to-do checkboxes.
+// Complete all remaining prep via the checkboxes.
 let clicks = 0;
 while ((await page.$('.pt-item:not(.done) .pt-check')) && clicks < 8) {
-  await page.click('.pt-item:not(.done) .pt-check'); await page.waitForTimeout(80); clicks++;
+  await page.click('.pt-item:not(.done) .pt-check'); await page.waitForTimeout(70); clicks++;
 }
-console.log('completed prep tasks:', clicks, '| all prep done:', (await page.$$eval('.pt-item.done', (n) => n.length)),
-  '| lanes prep-ready (expect 3):', await page.$$eval('.lane-prep.done', (n) => n.length));
+console.log('all prep done -> prep-ready lanes (expect 3):', await page.$$eval('.gantt-row.prep-ready', (n) => n.length));
+await page.screenshot({ path: 'tools/shot-prep.png' });
 
-// Complete a timed task -> a done block appears.
-await page.click('#timed-done');
-await page.waitForTimeout(150);
-console.log('after a timed task -> done blocks:', await page.$$eval('.gseg.done', (n) => n.length),
-  '| progress:', (await page.textContent('.hero-clock')).trim());
+// Every timed step has an info icon; dishes finish together.
+console.log('step info icons:', await page.$$eval('.gseg .seg-i', (n) => n.length));
+const ends = await page.$$eval('.gantt-row', (rows) => rows.filter((r) => r.querySelector('.gseg')).map((r) => {
+  const segs = [...r.querySelectorAll('.gseg')]; const last = segs[segs.length - 1];
+  return Math.round((parseFloat(last.style.left) + parseFloat(last.style.width)) * 10) / 10;
+}));
+console.log('dish end % (all 100):', JSON.stringify(ends), '=>', ends.length === 3 && ends.every((e) => Math.abs(e - 100) < 0.5) ? 'FINISH TOGETHER ✓' : 'CHECK');
+
+// START COOKING.
+await page.click('#start-btn');
+await page.waitForTimeout(400);
+console.log('after start -> now-line:', !!(await page.$('.gantt-nowline')),
+  '| timed bar:', (await page.$eval('.timed-now', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim(),
+  '| pause btn:', !!(await page.$('#pp-btn')));
+const scroll2 = await page.evaluate(() => ({ s: document.body.scrollHeight, c: document.documentElement.clientHeight }));
+console.log('cooking no-scroll:', scroll2.s <= scroll2.c + 1 ? 'FITS' : `SCROLLS (${scroll2.s}>${scroll2.c})`);
 await page.screenshot({ path: 'tools/shot-running.png' });
 
-// Wait state: everything done except rice's timed "Cook rice" (gated, not yet due).
-await page.evaluate(() => {
-  const doneSteps = {};
-  for (let i = 0; i < 4; i++) doneSteps[`chicken:${i}`] = 200;
-  for (let i = 0; i < 3; i++) doneSteps[`veggies:${i}`] = 200;
-  doneSteps['rice:0'] = 200; doneSteps['rice:1'] = 200; // rice preps done, Cook rice pending
-  localStorage.setItem('cook-with-me:run', JSON.stringify({ started: true, runningSince: Date.now() - 60000, accumMs: 0, doneSteps }));
-});
-await page.reload({ waitUntil: 'networkidle' });
-await page.waitForTimeout(200);
-console.log('timed wait message:', (await page.$eval('.timed-now.wait', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim());
-await page.screenshot({ path: 'tools/shot-wait.png' });
+// Tap a step block -> details in the header.
+await page.click('.gantt-row:first-child .gseg');
+await page.waitForTimeout(100);
+console.log('tapped step detail:', (await page.$eval('.gantt-detail', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim());
 
-// Persistence across reload.
-await page.reload({ waitUntil: 'networkidle' });
-await page.waitForTimeout(200);
-console.log('progress after reload:', (await page.textContent('.hero-clock')).trim());
+// Complete a timed task.
+await page.click('#timed-done');
+await page.waitForTimeout(150);
+console.log('after a timed task -> done blocks:', await page.$$eval('.gseg.done', (n) => n.length));
 
-// Editor.
+// Persistence: prep + start survive reload.
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(300);
+console.log('after reload -> prep done items:', await page.$$eval('.pt-item.done', (n) => n.length), '| cooking:', !!(await page.$('#pp-btn')));
+
+// Editor still lists the 3 dishes with prep toggles.
 await page.click('#edit-btn');
 await page.waitForTimeout(200);
-console.log('editor dishes:', await page.$$eval('.ed-dish', (n) => n.length),
-  '| prep toggles:', (await page.$$eval('.ed-step-prep-cb', (n) => n.length)) > 0);
+console.log('editor dishes:', await page.$$eval('.ed-dish', (n) => n.length), '| prep toggles:', (await page.$$eval('.ed-step-prep-cb', (n) => n.length)) > 0);
 await page.click('#editor-close');
 
-// Done state: mark every step complete.
+// Done state.
 await page.evaluate(() => {
-  const doneSteps = {};
-  const counts = { chicken: 4, rice: 3, veggies: 3 };
+  const doneSteps = {}; const counts = { chicken: 4, rice: 3, veggies: 3 };
   for (const id in counts) for (let i = 0; i < counts[id]; i++) doneSteps[`${id}:${i}`] = 1000;
   localStorage.setItem('cook-with-me:run', JSON.stringify({ started: true, runningSince: Date.now() - 60000, accumMs: 0, doneSteps }));
 });
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(200);
-console.log('done hero:', (await page.textContent('.hero-time')).trim());
+console.log('done state:', (await page.$eval('.timed-now.alldone', (n) => n.textContent).catch(() => '(none)')).trim());
 
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no console/page errors');
 await browser.close();
