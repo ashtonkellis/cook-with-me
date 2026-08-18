@@ -33,6 +33,9 @@ body {
   line-height: 1.4;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   -webkit-tap-highlight-color: transparent;
+  /* Disable double-tap-to-zoom (keeps pinch-zoom) so rapid taps on the ±15s /
+     pause controls register immediately instead of being treated as a zoom. */
+  touch-action: manipulation;
   /* Fit the whole app on one screen — no page scroll. Size to the *dynamic*
      viewport so the body always fills what's actually visible (svh is the
      smallest and left a gap when Safari's chrome collapsed). */
@@ -353,10 +356,10 @@ main {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;   /* compact: pack the lanes rather than spread them */
+  justify-content: space-evenly;  /* fill the timeline area — spread lanes evenly */
   gap: 6px;
   padding: 2px 0;
-  overflow-y: auto;
+  overflow: hidden;               /* every lane stays visible — never scroll */
 }
 .gantt-row {
   display: grid;
@@ -652,7 +655,11 @@ main {
     display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
     overflow: hidden; margin-top: 1px;
   }
-  .gantt-card { min-height: 168px; }
-  .gantt-row { min-height: 26px; }
+  .gantt-card { min-height: 150px; }
+  .gantt-row { min-height: 24px; }
   .hero { padding: 10px 16px; }
+  #start-btn { padding: 10px; }
+  .gantt-rows { gap: 3px; }
+  .gantt-axis { margin-top: 2px; }
+  .lane-prep { font-size: 0.58rem; }
 }

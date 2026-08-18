@@ -277,13 +277,13 @@ function computeProgress() {
   }
 
   timedActions.sort((a, b) => a.step.projStart - b.step.projStart);
-  // Prep tasks are ordered by when their dish's timed cooking begins — so the
-  // prep for the dish that starts cooking first is first in the list.
-  // Prep to-do list order matches the order dishes appear in the Gantt (row/di
-  // order), then step order within a dish.
-  const byGanttOrder = (a, b) => (a.di - b.di) || (a.si - b.si);
-  prepPending.sort(byGanttOrder);
-  prepAll.sort(byGanttOrder);
+  // Prep tasks (and Gantt lanes) are ordered by when their dish's timed cooking
+  // begins — the dish that starts cooking soonest comes first. Ties fall back to
+  // meal-definition order, then step order.
+  const dishStart = (x) => (x.dish && x.dish.startMs != null) ? x.dish.startMs : Infinity;
+  const byCookOrder = (a, b) => (dishStart(a) - dishStart(b)) || (a.di - b.di) || (a.si - b.si);
+  prepPending.sort(byCookOrder);
+  prepAll.sort(byCookOrder);
   const totalSteps = prepTotal + timedTotal;
   const doneCount = prepDone + timedDone;
   return {
@@ -551,8 +551,17 @@ function renderGantt(prog) {
   const nowPct = pct(elapsed);
 
   const picking = !run.started;
-  // Only chosen dishes appear (selection now happens in the picker modal).
-  const rows = prog.dishes.map((d) => {
+  // Lanes are sorted by when each dish starts cooking (earliest on top), so the
+  // timeline reads as a natural top-to-bottom cascade. `di` stays the dish's real
+  // index (used for color + selection); we only reorder the rendered rows.
+  const laneOrder = (a, b) => {
+    const ai = a.included !== false, bi = b.included !== false;
+    if (ai !== bi) return ai ? -1 : 1;
+    const as = a.startMs == null ? Infinity : a.startMs;
+    const bs = b.startMs == null ? Infinity : b.startMs;
+    return (as - bs) || (a.di - b.di);
+  };
+  const rows = [...prog.dishes].sort(laneOrder).map((d) => {
     const di = d.di;
     if (!d.included) return '';
     const hue = dishHue(di);
@@ -629,8 +638,8 @@ function renderGantt(prog) {
 
   // Head sub-line: the meal-done countdown + clock (always shown).
   const doneLabel = run.started
-    ? `🍽️ ready in <b>${fmtDur(remainingMs)}</b> · ~${doneClock}`
-    : `🍽️ ready ~${doneClock} if you start now`;
+    ? `🍽️ Ready in <b>${fmtDur(remainingMs)}</b> · ~${doneClock}`
+    : `🍽️ Ready ~${doneClock} if you start now`;
   const detail = `<span class="gantt-sub">${doneLabel}</span>`;
   // Tapping a step block opens a larger detail panel below the head.
   let detailPanel = '';
@@ -708,7 +717,7 @@ function renderGantt(prog) {
       ${rows || `<div class="gantt-empty">Choose dishes to see the timeline.</div>`}
       ${nowLayer}
     </div>
-    <div class="gantt-axis"><span>0:00</span><span class="ax-end">serve · ${total}</span></div>`;
+    <div class="gantt-axis"><span>0:00</span><span class="ax-end">Serve · ${total}</span></div>`;
 }
 
 // ---------- Alerts (sound + vibration + notification) ----------

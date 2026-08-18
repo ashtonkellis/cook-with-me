@@ -22,11 +22,19 @@ await page.click('.pick-row:first-child'); await page.waitForTimeout(60);
 await page.click('#picker-done');
 await page.waitForTimeout(150);
 
-// BEFORE cooking: TOP = prep to-do list (all 4 prep tasks), in Gantt/dish order.
+// BEFORE cooking: TOP = prep to-do list (all 4 prep tasks), in COOK-START order
+// (earliest-cooking dish first): chicken(0), veggies(8m), then rice(11m) x2.
 const prepItems = await page.$$eval('.prep-todo .pt-item', (ns) => ns.length);
 const prepOrder = await page.$$eval('.prep-todo .pt-item .pt-text b', (ns) => ns.map((n) => n.textContent.trim()));
 console.log('prep to-do items before start (expect 4):', prepItems);
-console.log('prep order (dish order — chicken, rice, rice, veggies):', JSON.stringify(prepOrder));
+const prepExpect = JSON.stringify(['Prep & season chicken', 'Prep veggies', 'Measure & wash rice', 'Set up Instant Pot']);
+console.log('prep order (cook-start order):', JSON.stringify(prepOrder), JSON.stringify(prepOrder) === prepExpect ? 'OK' : `EXPECTED ${prepExpect}`);
+
+// Gantt lanes are sorted by cook-start time: veggies (starts 8m in) ABOVE rice
+// (starts 11m in), because veggies starts sooner.
+const laneOrder = await page.$$eval('.gantt-row .gn', (ns) => ns.map((n) => n.textContent.trim()));
+const laneExpect = JSON.stringify(['BBQ chicken', 'Stir-fried veggies', 'Rice']);
+console.log('gantt lane order (by start time):', JSON.stringify(laneOrder), JSON.stringify(laneOrder) === laneExpect ? 'OK ✓' : `EXPECTED ${laneExpect}`);
 
 // BOTTOM: Start cooking button, no timed bar yet.
 console.log('start-cooking button present:', !!(await page.$('#start-btn')),

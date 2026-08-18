@@ -20,6 +20,22 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Gantt sort, fill, casing, double-tap, stale-cache fix (V23)** —
+  - **Gantt lanes now sort by cook-start time** (earliest-starting dish on top),
+    so Stir-fried veggies (starts 8 min in) sits ABOVE Rice (11 min in). The prep
+    to-do list follows the same cook-start order.
+  - **Confirmed total time excludes prep** — `computeSchedule` only sums timed
+    steps; smoke test asserts Serve · 21:00.
+  - **Gantt fills the remaining screen** — lanes spread evenly (`space-evenly`)
+    and never scroll (`overflow: hidden`); all lanes visible at once.
+  - **Casing audit** — "🍽️ Ready…", "Serve · 21:00" (capitalize first word after
+    the emoji, matching the rest of the UI).
+  - **Confirmed there's no Done button in the Gantt** (removed back in V20) —
+    users still seeing one were on a stale cache; see the SW fix below.
+  - **Disabled double-tap-to-zoom** (`touch-action: manipulation`) so rapid taps
+    on the ±15s / Pause controls register immediately (pinch-zoom still works).
+  - **Service worker is now network-first for the app shell**, so new deploys
+    land immediately instead of being pinned to an old cached version.
 - [x] **Fit the whole app on one iPhone screen, no scroll (V22)** — reworked the
       layout so the hero (prep) card shrinks (`flex: 0 1 auto`) and the Gantt card
       keeps a `min-height` floor, so the timeline is never crushed off-screen.

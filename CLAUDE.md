@@ -9,9 +9,17 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
 ### Todo-list workflow
 - `TODO.md` is the shared tracker with **Todo**, **In Progress**, **Done** (and
   a **Blocked / needs input** section when relevant).
-- When the user makes a request, add it to **Todo**.
-- When a task is finished, move it to **Done**.
+- **Add EVERY request to `TODO.md` (Todo) the moment it comes in** — including
+  each item when the user sends several at once, and new items that arrive
+  mid-task. Capture first, then act.
+- **Work items ONE AT A TIME.** Move an item to **In Progress** when you start
+  it and to **Done** the moment it's finished, before starting the next. Don't
+  lump many requests into a single blob of work — track and complete each
+  individually so the list always reflects real state.
 - When idle, work on the next item in **Todo**.
+- Batch only the *deploy* (see Deployment workflow), never the tracking: the
+  list should be updated per-item even though the push to `main` waits until the
+  Todo / In Progress sections are clear.
 
 ### Versioning workflow
 - The version lives in ONE place: `version.js` (`self.APP_VERSION`) — a simple
@@ -46,7 +54,16 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
 
 ## Architecture notes
 - **Scheduler** (`computeSchedule`): each dish starts at
-  `mealDuration − dishDuration` so all dishes end together.
+  `mealDuration − dishDuration` so all dishes end together. Only TIMED steps
+  count toward a dish's duration / the meal total — prep steps are excluded.
+- **Lane + prep order**: Gantt lanes and the prep to-do list are sorted by each
+  dish's cook-**start** time (earliest-starting dish on top), ties by definition
+  order. So a dish that starts cooking sooner sits above one that starts later.
+- **Service worker is network-first for the app shell** (`sw.js`): navigations
+  and HTML/JS/CSS/manifest are fetched from the network when online (falling back
+  to cache offline), so a new deploy lands immediately instead of being pinned to
+  a stale cache. Icons/images stay cache-first. Bumping `version.js` still renames
+  the cache and purges the old one on activate.
 - **Timers are wall-clock based**: run state is derived from an absolute
   timestamp (`runningSince` + `accumMs`), persisted to localStorage, so closing/
   reopening never resets — the food really keeps cooking. Pause freezes elapsed.
