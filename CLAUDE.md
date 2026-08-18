@@ -91,3 +91,12 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
 - Match the Wing Weather visual language: dark stacked cards, status pills, a
   colored left accent bar per card, big tabular-nums countdowns.
 - Keep it dependency-free and buildless so GitHub Pages serves it as-is.
+- **One-screen fit (no scroll)**: `body` is `height: 100dvh; overflow: hidden`,
+  a flex column of header / `main` / footer. Inside `main`, the hero (prep) card
+  is `flex: 0 1 auto` (shrinks but never grows past its content) and the Gantt
+  card is `flex: 1 1 auto` with a `min-height` floor so the timeline is never
+  crushed off-screen. The prep list (`.prep-todo`) is the only internal scroll,
+  as a last resort on very short screens. A `@media (max-height: 720px)` block
+  clamps prep notes to one line for iPhone SE / mini. When changing row heights
+  or paddings, re-run `tools/smoke.mjs` — it asserts `no-clip` (prep list AND
+  Gantt lanes fully visible) at 402×874, not just that the page doesn't scroll.

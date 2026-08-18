@@ -48,6 +48,12 @@ await page.waitForTimeout(100);
 
 const scroll1 = await page.evaluate(() => ({ s: document.body.scrollHeight, c: document.documentElement.clientHeight }));
 console.log('idle no-scroll:', scroll1.s <= scroll1.c + 1 ? 'FITS' : `SCROLLS (${scroll1.s}>${scroll1.c})`);
+// Planning view: prep list AND timeline lanes both fully visible (no clipping).
+const clip1 = await page.evaluate(() => {
+  const c = (s) => { const e = document.querySelector(s); return e ? e.scrollHeight > e.clientHeight + 2 : false; };
+  return { prep: c('.prep-todo'), rows: c('.gantt-rows') };
+});
+console.log('idle no-clip:', !clip1.prep && !clip1.rows ? 'ALL VISIBLE ✓' : `CLIPPED prep=${clip1.prep} rows=${clip1.rows}`);
 await page.screenshot({ path: 'tools/shot-idle.png' });
 
 // Prep can be done BEFORE cooking. Complete the first dish's prep -> its lane turns green.
@@ -91,6 +97,11 @@ console.log('after start -> now-line:', !!(await page.$('.gantt-nowline')),
   '| pause btn:', !!(await page.$('#pp-btn')));
 const scroll2 = await page.evaluate(() => ({ s: document.body.scrollHeight, c: document.documentElement.clientHeight }));
 console.log('cooking no-scroll:', scroll2.s <= scroll2.c + 1 ? 'FITS' : `SCROLLS (${scroll2.s}>${scroll2.c})`);
+const clip2 = await page.evaluate(() => {
+  const c = (s) => { const e = document.querySelector(s); return e ? e.scrollHeight > e.clientHeight + 2 : false; };
+  return { prep: c('.prep-todo'), rows: c('.gantt-rows') };
+});
+console.log('cooking no-clip:', !clip2.prep && !clip2.rows ? 'ALL VISIBLE ✓' : `CLIPPED prep=${clip2.prep} rows=${clip2.rows}`);
 // Countdown to the next step + rewind/ff buttons.
 console.log('next-step countdown:', (await page.$eval('.timed-next', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim(),
   '| rewind+ff btns:', !!(await page.$('#rew-btn')) && !!(await page.$('#ff-btn')));

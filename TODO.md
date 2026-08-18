@@ -20,6 +20,14 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Fit the whole app on one iPhone screen, no scroll (V22)** — reworked the
+      layout so the hero (prep) card shrinks (`flex: 0 1 auto`) and the Gantt card
+      keeps a `min-height` floor, so the timeline is never crushed off-screen.
+      Compacted the prep rows, header, footer, and main gaps; a
+      `@media (max-height: 720px)` block clamps prep notes to one line for iPhone
+      SE / mini. Verified with measurements + screenshots at 375×667, 390×844,
+      and 402×874 (all fit, no clip, no page scroll); smoke test now asserts
+      `no-clip` for the prep list and Gantt lanes, not just no page scroll.
 - [x] **Detail/prep/no-editor batch (V21)** —
   - Tapping a Gantt step opens a larger **step-detail panel** (emoji, label,
     status pill, scheduled clock window, full note, Close) instead of a one-liner.

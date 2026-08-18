@@ -50,7 +50,7 @@ body {
   width: 100%;
   max-width: 620px;
   margin: 0 auto;
-  padding: 12px 18px 6px;
+  padding: 8px 18px 4px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -79,10 +79,10 @@ main {
   width: 100%;
   max-width: 620px;
   margin: 0 auto;
-  padding: 6px 14px 6px;
+  padding: 4px 14px 4px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   overflow: hidden;
 }
 
@@ -107,7 +107,14 @@ main {
 }
 
 /* ---- Hero ---- */
-.hero { flex: none; background: linear-gradient(180deg, #0f3568, #0a2650); padding: 14px 16px 14px; }
+/* flex 0/1: never grows past its content, but shrinks when space is tight so the
+   Gantt keeps its guaranteed room. The prep list inside scrolls only as a last
+   resort on very short screens. */
+.hero {
+  flex: 0 1 auto; min-height: 0;
+  display: flex; flex-direction: column;
+  background: linear-gradient(180deg, #0f3568, #0a2650); padding: 12px 16px 12px;
+}
 .hero-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .hero-label { font-size: 0.8rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
 .hero-clock { font-size: 0.85rem; color: var(--muted); }
@@ -194,19 +201,19 @@ main {
 
 /* Prep to-do list — all prep tasks (done + pending) in cook order */
 .prep-todo {
-  list-style: none; margin: 6px 0 10px; padding: 0;
-  display: flex; flex-direction: column; gap: 8px;
-  max-height: 52vh; overflow-y: auto;
+  list-style: none; margin: 6px 0 2px; padding: 0;
+  display: flex; flex-direction: column; gap: 6px;
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
 }
 /* Collapsed once all prep is done — tight rows, no notes, so the timeline
    below gets the room back. */
-.prep-todo.compact { gap: 5px; max-height: 26vh; }
+.prep-todo.compact { gap: 5px; }
 .prep-todo.compact .pt-item { padding: 6px 10px; align-items: center; }
 .prep-todo.compact .pt-text b { font-size: 0.9rem; }
 .prep-todo.compact .pt-check, .prep-todo.compact .pt-emoji { margin-top: 0; }
 .pt-item {
-  display: flex; align-items: flex-start; gap: 11px;
-  padding: 11px 12px; border-radius: 12px;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 7px 10px; border-radius: 11px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid transparent;
   cursor: pointer;
@@ -233,15 +240,14 @@ main {
   display: grid; place-items: center;
   background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 9px;
 }
-.pt-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.3; }
-.pt-text b { font-size: 1rem; }
-.pt-text small { color: var(--muted); font-size: 0.8rem; }
+.pt-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; line-height: 1.25; }
+.pt-text b { font-size: 0.95rem; }
+.pt-text small { color: var(--muted); font-size: 0.78rem; }
 .pt-note {
-  color: var(--ink); opacity: 0.9; font-size: 0.82rem; line-height: 1.35;
-  margin-top: 3px; white-space: normal;
+  color: var(--ink); opacity: 0.9; font-size: 0.8rem; line-height: 1.3;
+  margin-top: 2px; white-space: normal;
 }
-.pt-check { margin-top: 2px; }
-.pt-emoji { margin-top: 1px; }
+.pt-check { margin-top: 1px; }
 .prep-empty { color: var(--muted); font-size: 0.95rem; margin: 8px 0 12px; }
 
 /* Timed action bar in the Gantt card */
@@ -285,7 +291,7 @@ main {
 /* ---- Gantt chart ---- */
 .gantt-card {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 188px;   /* never let the prep list crush the timeline off-screen */
   display: flex;
   flex-direction: column;
   padding: 12px 14px 8px;
@@ -357,7 +363,7 @@ main {
   grid-template-columns: var(--label-w) 1fr;
   column-gap: var(--gap);
   align-items: center;
-  min-height: 30px;
+  min-height: 28px;
   flex: none;
 }
 .gantt-row.excluded { opacity: 0.5; }
@@ -569,9 +575,9 @@ main {
   width: 100%;
   max-width: 620px;
   margin: 0 auto;
-  padding: 6px 16px calc(6px + env(safe-area-inset-bottom));
+  padding: 3px 16px calc(3px + env(safe-area-inset-bottom));
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   display: flex; flex-direction: row; gap: 14px; align-items: center; justify-content: center;
 }
 
@@ -635,4 +641,18 @@ main {
 @media (min-width: 520px) {
   .editor-overlay { align-items: center; }
   .editor-panel { border-radius: 20px; }
+}
+
+/* Short screens (e.g. iPhone SE / mini): clamp prep notes to one line and tighten
+   spacing so the whole app still fits one screen with no scroll. */
+@media (max-height: 720px) {
+  .prep-todo { gap: 5px; }
+  .pt-item { padding: 5px 9px; }
+  .pt-note {
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+    overflow: hidden; margin-top: 1px;
+  }
+  .gantt-card { min-height: 168px; }
+  .gantt-row { min-height: 26px; }
+  .hero { padding: 10px 16px; }
 }
