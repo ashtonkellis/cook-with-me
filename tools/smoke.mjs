@@ -78,6 +78,10 @@ const ends = await page.$$eval('.gantt-row', (rows) => rows.filter((r) => r.quer
   return Math.round((parseFloat(last.style.left) + parseFloat(last.style.width)) * 10) / 10;
 }));
 console.log('dish end % (all 100):', JSON.stringify(ends), '=>', ends.length === 3 && ends.every((e) => Math.abs(e - 100) < 0.5) ? 'FINISH TOGETHER ✓' : 'CHECK');
+// Total time EXCLUDES prep: longest timed-only dish is BBQ chicken (5+8+8=21m);
+// prep minutes (chicken 5, rice 3+3, veggies 6) must not inflate the total.
+const axisEnd = (await page.$eval('.ax-end', (n) => n.textContent).catch(() => '')).trim();
+console.log('total time (prep excluded):', axisEnd, '=>', /21:00/.test(axisEnd) ? 'OK (21:00)' : 'CHECK');
 
 // START COOKING.
 await page.click('#start-btn');
@@ -97,10 +101,14 @@ const after = await page.$eval('.now-flag', (n) => n.textContent).catch(() => '?
 console.log('fast-forward 15s:', before, '->', after);
 await page.screenshot({ path: 'tools/shot-running.png' });
 
-// Tap a step block -> details in the header.
+// Tap a step block -> larger detail panel (label, timing, note) + close button.
 await page.click('.gantt-row:first-child .gseg');
-await page.waitForTimeout(100);
-console.log('tapped step detail:', (await page.$eval('.gantt-detail', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim());
+await page.waitForTimeout(120);
+console.log('tapped step detail panel:', !!(await page.$('.step-detail')),
+  '| label:', (await page.$eval('.step-detail .sd-label', (n) => n.textContent).catch(() => '(none)')).trim(),
+  '| has close:', !!(await page.$('#detail-close')));
+await page.click('#detail-close'); await page.waitForTimeout(100);
+console.log('detail panel closes:', !(await page.$('.step-detail')));
 
 // Timed steps auto-complete by the wall clock (no Done button). Jump the clock
 // ~6 min in and confirm the first timed step's block flips to done on its own.
@@ -119,56 +127,33 @@ await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
 console.log('after reload -> prep done items:', await page.$$eval('.pt-item.done', (n) => n.length), '| cooking:', !!(await page.$('#pp-btn')));
 
-// Editor still lists the 3 dishes with prep toggles.
-await page.click('#edit-btn');
-await page.waitForTimeout(200);
-console.log('editor dishes:', await page.$$eval('.ed-dish', (n) => n.length), '| prep toggles:', (await page.$$eval('.ed-step-prep-cb', (n) => n.length)) > 0);
-await page.click('#editor-close');
+// Editing is fully removed — no gear button, no editor modal, no picker "Edit".
+console.log('editor removed:', !(await page.$('#edit-btn')) && !(await page.$('#editor')),
+  '| picker edit removed:', !(await page.$('#picker-edit')));
 
-// No-prep dish -> marked prep-ready. Give rice an all-timed set of steps.
+// The meal is code-sourced: a stale saved meal in localStorage is ignored/purged.
 await page.evaluate(() => {
-  const m = JSON.parse(localStorage.getItem('cook-with-me:meal'));
-  const rice = m.dishes.find((d) => d.id === 'rice');
-  rice.steps.forEach((s) => { delete s.prep; });
-  for (const d of m.dishes) d.included = (d.id === 'rice');
-  localStorage.setItem('cook-with-me:meal', JSON.stringify(m));
-  localStorage.setItem('cook-with-me:run', JSON.stringify({ started: false, runningSince: null, accumMs: 0, doneSteps: {} }));
+  localStorage.setItem('cook-with-me:meal', JSON.stringify({ dishes: [{ id: 'ghost', name: 'Stale test dish', emoji: '👻', included: true, steps: [{ label: 'x', minutes: 5 }] }] }));
 });
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(200);
-await page.click('#picker-done').catch(() => {});
-await page.waitForTimeout(120);
-console.log('no-prep dish prep-ready:', await page.$$eval('.gantt-row.prep-ready', (n) => n.length), '(expect 1, rice)');
+console.log('stale saved meal purged:', await page.evaluate(() => localStorage.getItem('cook-with-me:meal') === null),
+  '| no ghost dish in gantt:', !(await page.$$eval('.gantt-label .gn', (ns) => ns.some((n) => /stale test/i.test(n.textContent)))));
 
-// Single all-timed dish: start, run the clock past its timeline -> it finishes
-// on its own (no manual completion).
-await page.click('#start-btn'); await page.waitForTimeout(200);
+// Single included dish: prep done + clock past its timeline -> finishes on its own.
 await page.evaluate(() => {
-  const run = JSON.parse(localStorage.getItem('cook-with-me:run'));
-  run.runningSince = null; run.accumMs = 30 * 60 * 1000;   // well past rice's ~16 min
-  localStorage.setItem('cook-with-me:run', JSON.stringify(run));
+  localStorage.setItem('cook-with-me:included', JSON.stringify({ chicken: false, rice: true, veggies: false }));
+  localStorage.setItem('cook-with-me:run', JSON.stringify({ started: true, runningSince: null, accumMs: 30 * 60 * 1000, doneSteps: { 'rice:0': 1000, 'rice:1': 1000 } }));
 });
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(200);
-await page.click('#picker-done').catch(() => {});
-await page.waitForTimeout(120);
 console.log('single dish auto-completes by clock:', (await page.$eval('.timed-now.alldone', (n) => n.textContent).catch(() => '(none)')).trim());
 
-// Reset the default meal for a clean state.
+// Done state: all dishes, every prep ticked off + clock past the whole timeline.
 await page.evaluate(() => {
-  const m = JSON.parse(localStorage.getItem('cook-with-me:meal'));
-  const rice = m.dishes.find((d) => d.id === 'rice');
-  rice.steps[0].prep = true; rice.steps[1].prep = true;
-  for (const d of m.dishes) d.included = true;
-  localStorage.setItem('cook-with-me:meal', JSON.stringify(m));
-});
-
-// Done state: prep ticked off (manual) + clock past the whole timeline -> the
-// meal reads as ready.
-await page.evaluate(() => {
-  const m = JSON.parse(localStorage.getItem('cook-with-me:meal'));
-  const doneSteps = {};
-  for (const d of m.dishes) d.steps.forEach((s, si) => { if (s.prep) doneSteps[`${d.id}:${si}`] = 1000; });
+  localStorage.setItem('cook-with-me:included', JSON.stringify({ chicken: true, rice: true, veggies: true }));
+  // seed prep steps: chicken:0, rice:0, rice:1, veggies:0
+  const doneSteps = { 'chicken:0': 1000, 'rice:0': 1000, 'rice:1': 1000, 'veggies:0': 1000 };
   localStorage.setItem('cook-with-me:run', JSON.stringify({ started: true, runningSince: null, accumMs: 60 * 60 * 1000, doneSteps }));
 });
 await page.reload({ waitUntil: 'networkidle' });

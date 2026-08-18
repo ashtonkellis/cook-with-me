@@ -3,10 +3,11 @@
 // every dish finishes at the same moment. Timers are derived from an absolute
 // start timestamp (wall clock), so closing/reopening never resets progress.
 
-// ---------- Seed dish library ----------
-// `included` picks which dishes are in tonight's meal (chosen via checkboxes
-// before starting). By default only the fast TEST dishes are selected, so the
-// app opens ready for a ~15-second end-to-end run.
+// ---------- Meal definition ----------
+// The meal lives HERE in code — there is no in-app editor. Edit dishes/steps by
+// pushing changes to this file. `included` is the only per-dish state the app
+// persists (which dishes are in tonight's meal, chosen in the picker); the dish
+// content itself always comes from this seed.
 const EXAMPLE_MEAL = {
   name: 'BBQ dinner',
   dishes: [
@@ -38,8 +39,11 @@ const EXAMPLE_MEAL = {
   ],
 };
 
-const MEAL_KEY = 'cook-with-me:meal';
+const SEL_KEY = 'cook-with-me:included'; // per-dish included flags: { id: bool }
 const RUN_KEY = 'cook-with-me:run';
+// Legacy keys from when the whole meal (and a since-removed in-app editor) were
+// persisted. The meal is now code-sourced, so purge them on load.
+const LEGACY_KEYS = ['cook-with-me:meal', 'cook-with-me:migrated'];
 
 // ---------- State ----------
 let meal = null;              // { name, dishes: [{id,name,emoji,steps:[{label,minutes}]}] }
@@ -59,25 +63,15 @@ let selected = null;          // { di, si } — Gantt block tapped to inspect it
 // ---------- Elements ----------
 const el = {
   hero: document.getElementById('hero'),
-  dishes: document.getElementById('dishes'),
   gantt: document.getElementById('gantt'),
-  editBtn: document.getElementById('edit-btn'),
   chooseTop: document.getElementById('choose-top'),
-  editor: document.getElementById('editor'),
-  editorDishes: document.getElementById('editor-dishes'),
-  editorClose: document.getElementById('editor-close'),
-  editorCancel: document.getElementById('editor-cancel'),
-  editorSave: document.getElementById('editor-save'),
-  addDish: document.getElementById('add-dish'),
   picker: document.getElementById('picker'),
   pickerList: document.getElementById('picker-list'),
   pickerClose: document.getElementById('picker-close'),
   pickerDone: document.getElementById('picker-done'),
-  pickerEdit: document.getElementById('picker-edit'),
 };
 
 // ---------- Helpers ----------
-const uid = () => Math.random().toString(36).slice(2, 9);
 const MIN = 60 * 1000;
 
 function fmtDur(ms) {
@@ -91,7 +85,7 @@ function fmtDur(ms) {
 function fmtClock(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
-// Compact duration for totals: seconds when short (test dishes), else minutes.
+// Compact duration for totals: seconds when under ~90s, else whole minutes.
 function fmtLen(ms) {
   return ms < 90 * 1000 ? `${Math.round(ms / 1000)}s` : `${Math.round(ms / MIN)}m`;
 }
@@ -141,7 +135,7 @@ function toggleDish(id) {
   const d = meal.dishes.find((x) => x.id === id);
   if (!d) return;
   d.included = !(d.included !== false);
-  saveMeal();
+  saveSelection();
   schedule = computeSchedule(meal);
   render();
 }
@@ -403,46 +397,35 @@ function refresh() {
 const render = refresh;
 
 // ---------- Persistence ----------
-function saveMeal() {
-  try { localStorage.setItem(MEAL_KEY, JSON.stringify(meal)); } catch (_) {}
+// Only the per-dish `included` selection is saved (the dish content is code-
+// sourced from EXAMPLE_MEAL). Stored as { id: bool }, so dishes added to the
+// seed later default to their own `included` value rather than being hidden.
+function saveSelection() {
+  try {
+    const sel = {};
+    for (const d of meal.dishes) sel[d.id] = d.included !== false;
+    localStorage.setItem(SEL_KEY, JSON.stringify(sel));
+  } catch (_) {}
 }
 function saveRun() {
   try { localStorage.setItem(RUN_KEY, JSON.stringify(run)); } catch (_) {}
 }
-const MIGRATION_KEY = 'cook-with-me:migrated';
-const MIGRATION_VERSION = '1';
-// One-time heal for meals saved before prep/shared were categorized correctly.
-// For each seed dish (matched by id), copy the canonical prep/shared flags onto
-// the saved dish's matching steps (matched by label). Runs once — guarded by a
-// version flag — so it never overrides the user's later edits.
-function migrateMeal(m) {
+// The meal always comes from the code-defined seed; any stale saved meal (which
+// may hold old test dishes) is discarded. Apply the saved include/exclude
+// selection on top, keeping each dish's seed default when it isn't in the map.
+function loadMeal() {
+  try { for (const k of LEGACY_KEYS) localStorage.removeItem(k); } catch (_) {}
+  const m = JSON.parse(JSON.stringify(EXAMPLE_MEAL));
   try {
-    if (localStorage.getItem(MIGRATION_KEY) === MIGRATION_VERSION) return m;
-    for (const seed of EXAMPLE_MEAL.dishes) {
-      const dish = m.dishes.find((d) => d.id === seed.id);
-      if (!dish || !Array.isArray(dish.steps)) continue;
-      for (const seedStep of seed.steps) {
-        const step = dish.steps.find((s) => s.label === seedStep.label);
-        if (!step) continue;
-        if (seedStep.prep) step.prep = true; else { delete step.prep; delete step.ahead; }
-        if (seedStep.shared) step.shared = true;
+    const raw = localStorage.getItem(SEL_KEY);
+    if (raw) {
+      const sel = JSON.parse(raw);
+      if (sel && typeof sel === 'object') {
+        for (const d of m.dishes) if (d.id in sel) d.included = !!sel[d.id];
       }
     }
-    localStorage.setItem(MIGRATION_KEY, MIGRATION_VERSION);
-    localStorage.setItem(MEAL_KEY, JSON.stringify(m));
   } catch (_) {}
   return m;
-}
-function loadMeal() {
-  try {
-    const raw = localStorage.getItem(MEAL_KEY);
-    if (raw) {
-      const m = JSON.parse(raw);
-      if (m && Array.isArray(m.dishes) && m.dishes.length) return migrateMeal(m);
-    }
-  } catch (_) {}
-  try { localStorage.setItem(MIGRATION_KEY, MIGRATION_VERSION); } catch (_) {}
-  return JSON.parse(JSON.stringify(EXAMPLE_MEAL));
 }
 function loadRun() {
   try {
@@ -469,26 +452,33 @@ function renderHero(prog) {
   const prepAll = prog.prepAll || [];
   if (!prepAll.length) {
     el.hero.innerHTML = `
-      <div class="hero-top"><span class="hero-label">🔪 Prep</span><span class="hero-clock">no prep needed</span></div>
+      <div class="hero-top"><span class="hero-label">🔪 Prep</span><span class="hero-clock">No prep needed</span></div>
       <div class="prep-empty">No prep tasks — start cooking below ↓</div>`;
     return;
   }
 
+  // Full detail (emoji, duration, note per row) while prep is still pending — the
+  // planning phase. Once ALL prep is done the list collapses to a compact
+  // checklist so the timeline below gets the room.
+  const allPrepDone = prog.prepTotal > 0 && prog.prepDone === prog.prepTotal;
+  const collapsed = allPrepDone;
   const currentKey = prog.prepPending[0] ? prog.prepPending[0].key : null;
   const items = prepAll.map((p) => {
     const isCur = p.key === currentKey;
     const s = p.step;
+    const len = fmtLen(s.lenMs || (s.minutes * MIN));
+    const noteLine = (!collapsed && s.note) ? `<span class="pt-note">📝 ${escapeHtml(s.note)}</span>` : '';
     return `
       <li class="pt-item${p.done ? ' done' : ''}${isCur ? ' current' : ''}">
         <button class="pt-check" data-id="${escapeHtml(p.dish.id)}" data-si="${p.si}" aria-label="${p.done ? 'Undo' : 'Complete'} ${escapeHtml(s.label)}">${p.done ? '✓' : ''}</button>
         <span class="pt-emoji">${escapeHtml(p.dish.emoji)}</span>
         <span class="pt-text">
           <b>${escapeHtml(s.label)}${s.shareCount > 1 ? ` <span class="ahead-tag shared-tag">shared ×${s.shareCount}</span>` : ''}</b>
-          <small>${escapeHtml(p.dish.name)}${isCur && s.note ? ` · <span class="pt-note">📝 ${escapeHtml(s.note)}</span>` : ''}</small>
+          <small>${escapeHtml(p.dish.name)} · ${len}</small>
+          ${noteLine}
         </span>
       </li>`;
   }).join('');
-  const allPrepDone = prog.prepTotal > 0 && prog.prepDone === prog.prepTotal;
   const banner = allPrepDone
     ? `<div class="prep-done-banner">✅ All prep done — ready to cook!${run.started ? '' : ' Tap ▶ Start cooking below.'}</div>`
     : '';
@@ -498,7 +488,7 @@ function renderHero(prog) {
       <span class="hero-clock">${prog.prepDone}/${prog.prepTotal} prep done</span>
     </div>
     ${banner}
-    <ul class="prep-todo">${items}</ul>`;
+    <ul class="prep-todo${collapsed ? ' compact' : ''}">${items}</ul>`;
 }
 
 // Distinct hue per dish; steps within a dish graduate in lightness so each
@@ -508,6 +498,50 @@ function dishHue(i) { return DISH_HUES[i % DISH_HUES.length]; }
 function stepColor(hue, idx, total) {
   const l = total <= 1 ? 58 : 48 + Math.round((idx / (total - 1)) * 26); // 48%..74%
   return `hsl(${hue} 80% ${l}%)`;
+}
+
+// Status pill text + class for a projected step (used in the step-detail panel).
+const STEP_STATUS = {
+  active: { label: 'Cooking now', cls: 'active' },
+  waiting: { label: 'Up next', cls: 'waiting' },
+  done: { label: 'Done ✓', cls: 'done' },
+  shared: { label: 'Shared', cls: 'shared' },
+  'shared-done': { label: 'Shared ✓', cls: 'done' },
+  pending: { label: 'Prep · do any time', cls: 'prep' },
+};
+
+// Rich detail panel for the Gantt step tapped by the user (`selected`).
+function stepDetail(dish, step, elapsed) {
+  const isPrepStep = !!step.prep;
+  const st = STEP_STATUS[step.state] || { label: '', cls: '' };
+  const statusLabel = isPrepStep && step.state === 'done' ? 'Done ✓' : st.label;
+  const len = fmtLen(step.lenMs || (step.minutes * MIN));
+  let timing;
+  if (isPrepStep) {
+    timing = `<span class="sd-when">🔪 Prep — do any time · ${len}</span>`;
+  } else {
+    const base = run.started ? Date.now() - elapsed : Date.now();
+    const startC = fmtClock(base + step.projStart);
+    const endC = fmtClock(base + step.projEnd);
+    timing = `<span class="sd-when">🕐 ${startC} – ${endC}${run.started ? '' : ' (if you start now)'} · ${len}</span>`;
+  }
+  const note = step.note
+    ? `<p class="sd-note">📝 ${escapeHtml(step.note)}</p>`
+    : `<p class="sd-note sd-note-empty">No note for this step.</p>`;
+  return `
+    <div class="step-detail">
+      <div class="sd-head">
+        <span class="sd-emoji">${escapeHtml(dish.emoji)}</span>
+        <div class="sd-titles">
+          <span class="sd-label">${escapeHtml(step.label)}</span>
+          <span class="sd-dish">${escapeHtml(dish.name)}</span>
+        </div>
+        <span class="sd-status ${st.cls}">${statusLabel}</span>
+      </div>
+      ${timing}
+      ${note}
+      <button class="sd-close" id="detail-close" aria-label="Close details">✕ Close</button>
+    </div>`;
 }
 
 function renderGantt(prog) {
@@ -534,7 +568,7 @@ function renderGantt(prog) {
     // have NO prep steps at all (nothing to prep → ready to cook).
     const prepReady = prepDoneN === prepSteps.length;
     let prepBadge;
-    if (prepReady) prepBadge = `<span class="lane-prep done">${prepSteps.length ? '✓ prep ready' : '✓ no prep'}</span>`;
+    if (prepReady) prepBadge = `<span class="lane-prep done">${prepSteps.length ? '✓ Prep done' : '✓ No prep'}</span>`;
     else if (prepDoneN > 0) prepBadge = `<span class="lane-prep pending">🔪 ${prepSteps.length - prepDoneN} prep left</span>`;
     else prepBadge = `<span class="lane-prep">🔪 ${prepSteps.length} prep</span>`;
 
@@ -543,13 +577,13 @@ function renderGantt(prog) {
     if (!run.started) {
       status = fmtLen(d.durationMs); statusCls = '';
     } else if (!timedSteps.length) {
-      status = 'prep only'; statusCls = '';
+      status = 'Prep only'; statusCls = '';
     } else {
       const active = timedSteps.find((s) => s.state === 'active');
       const waiting = timedSteps.find((s) => s.state === 'waiting');
-      if (timedSteps.every((s) => s.state === 'done' || s.state === 'shared-done')) { status = '✓ done'; statusCls = 'done'; }
-      else if (active) { const r = active.projEnd - elapsed; status = r <= 0 ? 'go now' : `${fmtDur(r)} left`; statusCls = 'cook'; }
-      else if (waiting) { status = `in ${fmtDur(Math.max(0, waiting.projStart - elapsed))}`; statusCls = 'wait'; }
+      if (timedSteps.every((s) => s.state === 'done' || s.state === 'shared-done')) { status = '✓ Done'; statusCls = 'done'; }
+      else if (active) { const r = active.projEnd - elapsed; status = r <= 0 ? 'Go now' : `${fmtDur(r)} left`; statusCls = 'cook'; }
+      else if (waiting) { status = `In ${fmtDur(Math.max(0, waiting.projStart - elapsed))}`; statusCls = 'wait'; }
       else { status = ''; statusCls = ''; }
     }
 
@@ -593,17 +627,17 @@ function renderGantt(prog) {
   const remainingMs = Math.max(0, prog.timelineMs - elapsed);
   const doneClock = fmtClock(Date.now() + remainingMs);
 
-  // Detail line: the tapped step's note, else the meal-done countdown + clock.
+  // Head sub-line: the meal-done countdown + clock (always shown).
   const doneLabel = run.started
     ? `🍽️ ready in <b>${fmtDur(remainingMs)}</b> · ~${doneClock}`
     : `🍽️ ready ~${doneClock} if you start now`;
-  let detail = `<span class="gantt-sub">${doneLabel}</span>`;
+  const detail = `<span class="gantt-sub">${doneLabel}</span>`;
+  // Tapping a step block opens a larger detail panel below the head.
+  let detailPanel = '';
   if (selected) {
-    const sd = schedule.dishes[selected.di];
-    const ss = sd && sd.steps[selected.si];
-    if (ss) {
-      detail = `<span class="gantt-detail">${escapeHtml(sd.emoji)} <b>${escapeHtml(ss.label)}</b> · ${fmtLen(ss.lenMs || (ss.minutes * MIN))}${ss.note ? ` — 📝 ${escapeHtml(ss.note)}` : ' — no note'}</span>`;
-    }
+    const pd = prog.dishes[selected.di];
+    const ps = pd && pd.steps && pd.steps[selected.si];
+    if (ps) detailPanel = stepDetail(pd, ps, elapsed);
   }
 
   // The next timed step to begin (soonest waiting), for the countdown.
@@ -668,6 +702,7 @@ function renderGantt(prog) {
       <span class="gantt-title">Meal timeline</span>
       ${detail}
     </div>
+    ${detailPanel}
     ${cookBar}
     <div class="gantt-rows">
       ${rows || `<div class="gantt-empty">Choose dishes to see the timeline.</div>`}
@@ -714,97 +749,6 @@ function notify(title, body) {
   }
 }
 
-// ---------- Editor ----------
-let draft = null;
-function openEditor() {
-  draft = JSON.parse(JSON.stringify(meal));
-  renderEditor();
-  el.editor.hidden = false;
-}
-function closeEditor() { el.editor.hidden = true; draft = null; }
-
-function renderEditor() {
-  el.editorDishes.innerHTML = '';
-  draft.dishes.forEach((d, di) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'ed-dish';
-    const steps = d.steps.map((s, si) => `
-      <div class="ed-step" data-di="${di}" data-si="${si}">
-        <div class="ed-step-main">
-          <input class="ed-step-label" value="${escapeHtml(s.label)}" placeholder="Step" />
-          <input class="ed-step-min" type="number" min="0" step="any" value="${s.minutes}" inputmode="decimal" />
-          <button class="ed-remove ed-remove-step" aria-label="Remove step">✕</button>
-        </div>
-        <input class="ed-step-note" value="${escapeHtml(s.note || '')}" placeholder="Note (optional) — e.g. Instant Pot: Manual, 3 min" />
-        <label class="ed-step-ahead"><input type="checkbox" class="ed-step-prep-cb"${(s.prep || s.ahead) ? ' checked' : ''} /> Prep task (untimed — do any time, shown in the prep list)</label>
-        <label class="ed-step-ahead"><input type="checkbox" class="ed-step-shared-cb"${s.shared ? ' checked' : ''} /> Shared step — same-labeled steps are done once (e.g. Preheat BBQ)</label>
-      </div>`).join('');
-    wrap.innerHTML = `
-      <div class="ed-dish-top">
-        <input class="ed-emoji" value="${escapeHtml(d.emoji)}" maxlength="4" aria-label="Emoji" />
-        <input class="ed-name" value="${escapeHtml(d.name)}" placeholder="Dish name" />
-        <button class="ed-remove ed-remove-dish" aria-label="Remove dish">🗑</button>
-      </div>
-      <div class="ed-steps">${steps}</div>
-      <button class="btn ghost ed-addstep" data-di="${di}">+ Add step</button>`;
-    el.editorDishes.appendChild(wrap);
-  });
-}
-
-// Read the DOM back into `draft` before structural changes / save.
-function syncDraftFromDom() {
-  const dishEls = el.editorDishes.querySelectorAll('.ed-dish');
-  dishEls.forEach((de, di) => {
-    draft.dishes[di].emoji = de.querySelector('.ed-emoji').value.trim() || '🍽️';
-    draft.dishes[di].name = de.querySelector('.ed-name').value.trim() || 'Dish';
-    de.querySelectorAll('.ed-step').forEach((se, si) => {
-      draft.dishes[di].steps[si].label = se.querySelector('.ed-step-label').value.trim() || 'Step';
-      const mins = parseFloat(se.querySelector('.ed-step-min').value);
-      draft.dishes[di].steps[si].minutes = mins > 0 ? mins : 1; // supports fractional (test) minutes
-      draft.dishes[di].steps[si].note = se.querySelector('.ed-step-note').value.trim();
-      draft.dishes[di].steps[si].prep = se.querySelector('.ed-step-prep-cb').checked;
-      delete draft.dishes[di].steps[si].ahead; // migrated to `prep`
-      draft.dishes[di].steps[si].shared = se.querySelector('.ed-step-shared-cb').checked;
-    });
-  });
-}
-
-function saveEditor() {
-  syncDraftFromDom();
-  draft.dishes = draft.dishes.filter((d) => d.steps.length > 0);
-  if (!draft.dishes.length) { alert('Add at least one dish with a step.'); return; }
-  meal = draft;
-  meal.dishes.forEach((d) => { if (!d.id) d.id = uid(); });
-  saveMeal();
-  schedule = computeSchedule(meal);
-  resetMeal(); // editing changes the schedule; start fresh
-  closeEditor();
-}
-
-// Editor event delegation
-el.editorDishes.addEventListener('click', (e) => {
-  const t = e.target;
-  if (t.classList.contains('ed-remove-step')) {
-    syncDraftFromDom();
-    const row = t.closest('.ed-step');
-    draft.dishes[+row.dataset.di].steps.splice(+row.dataset.si, 1);
-    renderEditor();
-  } else if (t.classList.contains('ed-remove-dish')) {
-    syncDraftFromDom();
-    const di = [...el.editorDishes.children].indexOf(t.closest('.ed-dish'));
-    draft.dishes.splice(di, 1);
-    renderEditor();
-  } else if (t.classList.contains('ed-addstep')) {
-    syncDraftFromDom();
-    draft.dishes[+t.dataset.di].steps.push({ label: 'New step', minutes: 5, note: '' });
-    renderEditor();
-  }
-});
-el.addDish.addEventListener('click', () => {
-  syncDraftFromDom();
-  draft.dishes.push({ id: uid(), name: 'New dish', emoji: '🍽️', steps: [{ label: 'Step', minutes: 5, note: '' }] });
-  renderEditor();
-});
 // Prep to-do list: tap anywhere on a row to toggle it complete (the whole row
 // is the tap target, not just the checkbox — easier to hit on touch).
 el.hero.addEventListener('click', (e) => {
@@ -822,6 +766,7 @@ el.gantt.addEventListener('click', (e) => {
     if (isAllDone() || confirm('Reset the whole meal timer?')) resetMeal();
     return;
   }
+  if (e.target.closest('#detail-close')) { selected = null; render(); return; }
   const seg = e.target.closest('.gseg');
   if (!seg) return;
   const di = +seg.dataset.di, si = +seg.dataset.si;
@@ -829,12 +774,7 @@ el.gantt.addEventListener('click', (e) => {
   render();
 });
 
-el.editBtn.addEventListener('click', openEditor);
 el.chooseTop.addEventListener('click', openPicker);
-el.editorClose.addEventListener('click', closeEditor);
-el.editorCancel.addEventListener('click', closeEditor);
-el.editorSave.addEventListener('click', saveEditor);
-el.editor.addEventListener('click', (e) => { if (e.target === el.editor) closeEditor(); });
 
 // ---------- Dish picker ----------
 function openPicker() { renderPicker(); el.picker.hidden = false; }
@@ -860,7 +800,6 @@ el.picker.addEventListener('click', (e) => {
 });
 el.pickerClose.addEventListener('click', closePicker);
 el.pickerDone.addEventListener('click', closePicker);
-el.pickerEdit.addEventListener('click', () => { closePicker(); openEditor(); });
 
 // ---------- Boot ----------
 function init() {
@@ -868,7 +807,6 @@ function init() {
   if (vEl) vEl.textContent = 'V' + (self.APP_VERSION || '0');
 
   meal = loadMeal();
-  meal.dishes.forEach((d) => { if (!d.id) d.id = uid(); });
   schedule = computeSchedule(meal);
   run = loadRun();
   // Prime alert state from the current progress so reopening a running meal

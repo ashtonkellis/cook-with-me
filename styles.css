@@ -157,9 +157,15 @@ main {
   padding: 9px 12px; border-radius: 11px; margin: 8px 0;
 }
 
-/* A dish whose prep is all done turns green in the Gantt */
+/* A dish whose prep (precursor steps) is all done turns clearly green in the
+   Gantt — a tinted lane, a green left accent bar, and a filled "Prep done" pill. */
+.gantt-row.prep-ready {
+  background: rgba(55, 197, 123, 0.12);
+  box-shadow: inset 3px 0 0 0 var(--done);
+  border-radius: 9px;
+}
 .gantt-row.prep-ready .gn { color: var(--done); }
-.gantt-row.prep-ready .gantt-track { box-shadow: inset 0 0 0 1.5px rgba(55, 197, 123, 0.7); }
+.gantt-row.prep-ready .gantt-track { box-shadow: inset 0 0 0 2px rgba(55, 197, 123, 0.85); }
 
 /* ---- Guided action card ---- */
 .action {
@@ -189,12 +195,18 @@ main {
 /* Prep to-do list — all prep tasks (done + pending) in cook order */
 .prep-todo {
   list-style: none; margin: 6px 0 10px; padding: 0;
-  display: flex; flex-direction: column; gap: 6px;
-  max-height: 42vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: 52vh; overflow-y: auto;
 }
+/* Collapsed once all prep is done — tight rows, no notes, so the timeline
+   below gets the room back. */
+.prep-todo.compact { gap: 5px; max-height: 26vh; }
+.prep-todo.compact .pt-item { padding: 6px 10px; align-items: center; }
+.prep-todo.compact .pt-text b { font-size: 0.9rem; }
+.prep-todo.compact .pt-check, .prep-todo.compact .pt-emoji { margin-top: 0; }
 .pt-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: 11px;
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 11px 12px; border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid transparent;
   cursor: pointer;
@@ -221,10 +233,15 @@ main {
   display: grid; place-items: center;
   background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 9px;
 }
-.pt-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
-.pt-text b { font-size: 0.95rem; }
-.pt-text small { color: var(--muted); font-size: 0.78rem; }
-.pt-note { color: var(--ink); opacity: 0.85; }
+.pt-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.3; }
+.pt-text b { font-size: 1rem; }
+.pt-text small { color: var(--muted); font-size: 0.8rem; }
+.pt-note {
+  color: var(--ink); opacity: 0.9; font-size: 0.82rem; line-height: 1.35;
+  margin-top: 3px; white-space: normal;
+}
+.pt-check { margin-top: 2px; }
+.pt-emoji { margin-top: 1px; }
 .prep-empty { color: var(--muted); font-size: 0.95rem; margin: 8px 0 12px; }
 
 /* Timed action bar in the Gantt card */
@@ -282,8 +299,44 @@ main {
   margin-left: auto; min-width: 0; text-align: right;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.gantt-detail { font-size: 0.76rem; color: var(--ink); }
-.gantt-detail b { color: var(--active); }
+/* Step-detail panel — opened by tapping a step block in the Gantt */
+.step-detail {
+  flex: none;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--active);
+  border-radius: 13px;
+  padding: 12px 13px;
+  margin-bottom: 10px;
+}
+.sd-head { display: flex; align-items: flex-start; gap: 10px; }
+.sd-emoji {
+  flex: none; font-size: 1.4rem; width: 40px; height: 40px;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 11px;
+}
+.sd-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.sd-label { font-size: 1.15rem; font-weight: 800; }
+.sd-dish { font-size: 0.82rem; color: var(--muted); }
+.sd-status {
+  flex: none; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.02em;
+  padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  background: rgba(255, 255, 255, 0.1); color: var(--ink);
+}
+.sd-status.active { background: var(--active); color: #2a1800; }
+.sd-status.done { background: var(--done); color: #05261a; }
+.sd-status.waiting { background: rgba(255, 255, 255, 0.12); color: var(--muted); }
+.sd-status.prep, .sd-status.shared { background: #7dd3fc; color: #06283d; }
+.sd-when { display: block; margin-top: 9px; font-size: 0.86rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+.sd-note { margin: 8px 0 0; font-size: 0.9rem; line-height: 1.4; color: var(--ink); }
+.sd-note-empty { color: var(--muted); font-style: italic; }
+.sd-close {
+  margin-top: 11px; width: 100%; padding: 9px; border-radius: 10px;
+  background: transparent; border: 1px solid var(--line); color: var(--muted);
+  font-weight: 700; font-size: 0.85rem; cursor: pointer;
+  transition: transform 90ms ease, filter 90ms ease;
+}
+.sd-close:active { transform: scale(0.98); filter: brightness(1.2); }
 .gseg { cursor: pointer; transition: filter 90ms ease; }
 .gseg:active { filter: brightness(1.2); }
 .gseg.sel { box-shadow: 0 0 0 2px var(--accent), 0 0 12px 1px hsl(var(--hue) 90% 60% / 0.5); z-index: 3; }
@@ -333,7 +386,10 @@ main {
 .gantt-label .gs.done { color: var(--done); font-weight: 700; }
 .gantt-label .gs.off { color: var(--muted); opacity: 0.8; }
 .lane-prep { font-size: 0.62rem; font-weight: 700; color: var(--muted); letter-spacing: 0.01em; }
-.lane-prep.done { color: var(--done); }
+.lane-prep.done {
+  color: #05261a; background: var(--done);
+  padding: 1px 7px; border-radius: 999px; font-weight: 800;
+}
 .lane-prep.pending { color: var(--active); }
 .gantt-label .ge.prep-ready { box-shadow: 0 0 0 2px var(--done); border-color: transparent; }
 .gantt-label .ge.prep-pending { box-shadow: 0 0 0 2px var(--active); border-color: transparent; }
@@ -538,33 +594,6 @@ main {
 }
 .editor-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .editor-head h2 { margin: 0; font-size: 1.2rem; }
-.editor-dishes { display: flex; flex-direction: column; gap: 14px; margin-bottom: 12px; }
-
-.ed-dish { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--card-2); }
-.ed-dish-top { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
-.ed-emoji { width: 52px; text-align: center; font-size: 1.2rem; }
-.ed-name { flex: 1; }
-.ed-steps { display: flex; flex-direction: column; gap: 10px; }
-.ed-step { display: flex; flex-direction: column; gap: 6px; }
-.ed-step-main { display: flex; gap: 6px; align-items: center; }
-.ed-step .ed-step-label { flex: 1; }
-.ed-step .ed-step-min { width: 74px; }
-.ed-step .ed-step-note { font-size: 0.85rem; opacity: 0.95; }
-.ed-step-ahead { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; color: var(--muted); cursor: pointer; }
-.ed-step-ahead input { width: auto; }
-.ed-remove { background: none; border: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; padding: 0 6px; }
-.ed-addstep { align-self: flex-start; margin-top: 4px; }
-
-.editor-panel input {
-  font-size: 0.95rem;
-  padding: 9px 11px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--ink);
-  width: 100%;
-}
-.editor-panel input:focus { outline: 2px solid var(--accent); }
 .editor-actions { display: flex; gap: 10px; margin-top: 16px; }
 
 /* ---- Dish picker ---- */

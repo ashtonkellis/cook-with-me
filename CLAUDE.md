@@ -60,6 +60,19 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
   - `included` picks which dishes are in the meal (chosen in the picker modal).
   Emoji is the per-dish "image". Seeded meal: BBQ chicken, Rice, Stir-fried
   veggies (all selected by default).
+- **The meal is code-sourced — there is NO in-app editor.** `EXAMPLE_MEAL` in
+  `app.js` is the single source of truth for dish/step content; edit dishes by
+  pushing changes to that file. The app persists ONLY the per-dish include/
+  exclude selection (`cook-with-me:included`, a `{id: bool}` map) plus run state
+  — never the dish content — so stale/old saved meals (and any leftover test
+  dishes) can't reappear. `loadMeal()` deep-copies the seed and overlays the
+  saved selection; legacy `cook-with-me:meal` / `:migrated` keys are purged on
+  load. The picker (🍽️ header icon) only toggles which dishes are included.
+- **Prep list collapses when done**: the top prep to-do list shows full detail
+  (dish, duration, note per row) while prep is pending; once all prep is checked
+  off it collapses to a compact checklist so the Gantt gets the room back.
+- **Gantt step detail**: tapping a step block opens a `.step-detail` panel
+  (emoji, label, status pill, scheduled clock window, full note, Close).
 - **Progress model**: `computeProgress()` projects each step onto the shared
   timeline (a two-pass build) and derives states. **Timed steps complete
   automatically as the wall clock passes their scheduled end** — there is no

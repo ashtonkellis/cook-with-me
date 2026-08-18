@@ -20,6 +20,23 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Detail/prep/no-editor batch (V21)** —
+  - Tapping a Gantt step opens a larger **step-detail panel** (emoji, label,
+    status pill, scheduled clock window, full note, Close) instead of a one-liner.
+  - The prep to-do list is **bigger and shows each step's detail** (dish,
+    duration, note) while prep is pending; it **collapses to a compact checklist**
+    once all prep is done so the Gantt keeps its room.
+  - **Prep-ready dishes are far more obvious** in the Gantt: green-tinted lane,
+    green left accent bar, green track outline, and a filled "✓ Prep done" pill.
+  - **Removed dish editing entirely** (the ⚙️ editor + all editor logic + the
+    picker's "Edit dishes"). Dishes are now **code-sourced from `EXAMPLE_MEAL`**;
+    only the include/exclude selection is persisted, which **purges old/test
+    dishes** from stale localStorage. Edit dishes via GitHub pushes.
+  - **Casing audit**: dish/step/note data already consistent (sentence case);
+    aligned the Gantt gutter statuses + pills to match ("Prep only", "✓ Done",
+    "Go now", "In 3:00", "No prep needed").
+  - **Confirmed scheduling excludes prep from total time** (verified in
+    `computeSchedule` + a new smoke assertion: total = 21:00, prep not counted).
 - [x] **Remove tap-to-complete timed steps (V20)** — dropped the Gantt "✓ Done"
       button and all its logic (`markDone`, `maybeJumpAhead`, the `#timed-done`
       handler, the doneSteps-driven timed states). Timed steps now complete
