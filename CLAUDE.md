@@ -60,9 +60,13 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
   - `included` picks which dishes are in the meal (chosen in the picker modal).
   Emoji is the per-dish "image". Seeded meal: BBQ chicken, Rice, Stir-fried
   veggies (all selected by default).
-- **Guided model**: `computeProgress()` projects step times/states from actual
-  completions (`run.doneSteps`), yielding the one-at-a-time action queue and the
-  live Gantt. Completion is fully manual ("Tap when complete").
+- **Progress model**: `computeProgress()` projects each step onto the shared
+  timeline (a two-pass build) and derives states. **Timed steps complete
+  automatically as the wall clock passes their scheduled end** — there is no
+  manual "Done" button in the Gantt. **Prep steps stay manual**: they're ticked
+  off any time (even before cooking) in the top to-do list, stored in
+  `run.doneSteps`. The meal is `allDone` when every timed step's time has passed
+  AND all prep is checked off.
 - Files: `index.html`, `styles.css`, `app.js`, `version.js`, `sw.js`,
   `manifest.webmanifest`, `icons/`.
 - **Icons**: `icons/icon-source.png` is the master art. Regenerate the app

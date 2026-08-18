@@ -20,6 +20,13 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Remove tap-to-complete timed steps (V20)** — dropped the Gantt "✓ Done"
+      button and all its logic (`markDone`, `maybeJumpAhead`, the `#timed-done`
+      handler, the doneSteps-driven timed states). Timed steps now complete
+      automatically as the wall clock passes their scheduled end; the current-
+      task bar is informational (task + live countdown). Prep completion stays
+      manual in the top to-do list. `computeProgress` rebuilt as a two-pass,
+      clock-driven model; smoke test updated to verify auto-completion.
 - [x] **Prep/UI polish batch (V19)** — auto-heal stale saved meals so the seed
       dishes always get the right prep categorization (fixes prep steps showing
       in the Gantt on old localStorage data, run once via a migration flag);

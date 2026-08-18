@@ -158,8 +158,8 @@ function allStepStarts() {
 }
 
 // ---------- Run clock ----------
-// Elapsed time in the meal (wall-clock based, pause-aware). Not capped — with
-// manual completion the meal can run past its planned duration.
+// Elapsed time in the meal (wall-clock based, pause-aware). Timed steps
+// complete as the clock passes their scheduled end.
 function elapsedMs() {
   if (!run.started) return 0;
   const live = run.runningSince != null ? Date.now() - run.runningSince : 0;
@@ -168,14 +168,11 @@ function elapsedMs() {
 const isRunning = () => run.started && run.runningSince != null;
 const stepKey = (dishId, si) => `${dishId}:${si}`;
 
-// Is a step marked complete? Completion times are stored in meal-elapsed ms.
-function isStepDone(dishId, si) {
-  return run.doneSteps ? stepKey(dishId, si) in run.doneSteps : false;
-}
+// Whole meal complete? Timed steps finish by the clock, prep is ticked off
+// manually — computeProgress folds both into `allDone`.
 function isAllDone() {
   if (!run.started) return false;
-  return schedule.dishes.filter((d) => d.included)
-    .every((d) => d.steps.every((_, si) => isStepDone(d.id, si)));
+  return computeProgress().allDone;
 }
 
 // Shared steps: steps flagged `shared` with the same label across included
@@ -206,62 +203,82 @@ function sharedInfo() {
 //   • timed — scheduled steps projected onto the Gantt (bottom)
 function computeProgress() {
   const elapsed = elapsedMs();
-  const done = run.doneSteps || {};
+  const done = run.doneSteps || {};   // prep completions only (manual checkoffs)
   const shared = sharedInfo();
+  let timelineMs = schedule.mealMs;
+
+  // Pass A — project every step onto the shared timeline. Timed steps are
+  // scheduled (start = cursor / dish start, end = start + length); prep steps
+  // are untimed. Record each timed step's projected end so a shared step's
+  // "owner done" can be judged by the wall clock in pass B.
+  const endByKey = {};
+  const projByDish = [];
+  for (let di = 0; di < schedule.dishes.length; di++) {
+    const d = schedule.dishes[di];
+    if (!d.included) { projByDish.push(null); continue; }
+    let cursor = 0;
+    const rows = d.steps.map((s, si) => {
+      const key = stepKey(d.id, si);
+      const sh = shared[key];
+      const redundant = !!(sh && !sh.isOwner);
+      const shareCount = sh ? sh.count : 0;
+      const ownerKey = sh ? sh.ownerKey : null;
+      if (s.prep) return { si, key, prep: true, redundant, shareCount, ownerKey };
+      const projStart = Math.max(cursor, s.startMs || 0);
+      const projEnd = projStart + s.lenMs;
+      cursor = projEnd;
+      endByKey[key] = projEnd;
+      return { si, key, prep: false, redundant, shareCount, ownerKey, projStart, projEnd };
+    });
+    timelineMs = Math.max(timelineMs, cursor);
+    projByDish.push(rows);
+  }
+
+  // Pass B — derive each step's state. TIMED steps complete automatically as the
+  // wall clock passes their scheduled end; PREP steps stay manual (ticked off in
+  // the top to-do list, any time — even before cooking starts).
   const dishes = [];
   const timedActions = [];
   const prepPending = [];
   const prepAll = [];
-  let timelineMs = schedule.mealMs;
   let timedTotal = 0, timedDone = 0, prepTotal = 0, prepDone = 0;
 
   for (let di = 0; di < schedule.dishes.length; di++) {
     const d = schedule.dishes[di];
-    if (!d.included) { dishes.push({ ...d, di }); continue; }
-    let cursor = 0;
-    let timedActionFound = false;
-    const steps = d.steps.map((s, si) => {
-      const key = stepKey(d.id, si);
-      const sh = shared[key];
-      const redundant = sh && !sh.isOwner;
-      const ownerDone = sh ? sh.ownerKey in done : false;
-      const finished = key in done || (redundant && ownerDone);
-      const shareCount = sh ? sh.count : 0;
+    const rows = projByDish[di];
+    if (!d.included || !rows) { dishes.push({ ...d, di }); continue; }
+    const steps = rows.map((r) => {
+      const s = d.steps[r.si];
+      const { si, key, redundant, shareCount, ownerKey } = r;
+      const ownerDonePrep = ownerKey ? ownerKey in done : false;
+      const ownerDoneClock = ownerKey ? elapsed >= (endByKey[ownerKey] ?? Infinity) : false;
 
-      if (s.prep) {
+      if (r.prep) {
+        const finished = key in done || (redundant && ownerDonePrep);
         if (!redundant) { prepTotal++; if (finished) prepDone++; }
-        const state = finished ? 'done' : (redundant ? (ownerDone ? 'shared-done' : 'shared') : 'pending');
+        const state = finished ? 'done' : (redundant ? (ownerDonePrep ? 'shared-done' : 'shared') : 'pending');
         const entry = { di, si, key, dish: d, step: { ...s, si, key, shareCount }, done: finished };
         if (!redundant) prepAll.push(entry);
         if (!redundant && !finished) prepPending.push(entry);
         return { ...s, si, key, state, redundant, shareCount };
       }
 
-      // timed step — projected onto the shared meal timeline
-      const projStart = Math.max(cursor, s.startMs || 0);
-      let projEnd, state;
+      // timed step — state driven by the wall clock
+      let state;
       if (redundant) {
-        projEnd = projStart + s.lenMs;
-        state = ownerDone ? 'shared-done' : 'shared';
-      } else if (finished) {
-        projEnd = done[key];
-        state = 'done';
-        timedTotal++; timedDone++;
+        state = ownerDoneClock ? 'shared-done' : 'shared';
       } else {
         timedTotal++;
-        projEnd = projStart + s.lenMs;
-        if (!timedActionFound) {
-          timedActionFound = true;
-          state = elapsed >= projStart - 1 ? 'active' : 'waiting';
-          if (state === 'active') timedActions.push({ di, si, dish: d, step: { ...s, si, key, projStart, projEnd, shareCount } });
+        if (elapsed >= r.projEnd) { state = 'done'; timedDone++; }
+        else if (run.started && elapsed >= r.projStart - 1) {
+          state = 'active';
+          timedActions.push({ di, si, dish: d, step: { ...s, si, key, projStart: r.projStart, projEnd: r.projEnd, shareCount } });
         } else {
           state = 'waiting';
         }
       }
-      cursor = projEnd;
-      return { ...s, si, key, projStart, projEnd, state, redundant, shareCount };
+      return { ...s, si, key, projStart: r.projStart, projEnd: r.projEnd, state, redundant, shareCount };
     });
-    timelineMs = Math.max(timelineMs, cursor);
     dishes.push({ ...d, di, steps });
   }
 
@@ -282,16 +299,6 @@ function computeProgress() {
   };
 }
 
-function markDone(dishId, si) {
-  if (!run.started) return;
-  run.doneSteps = run.doneSteps || {};
-  run.doneSteps[stepKey(dishId, si)] = elapsedMs();
-  if ('vibrate' in navigator) navigator.vibrate(30);
-  maybeJumpAhead(); // if only one dish is left, skip the idle wait
-  saveRun();
-  refresh();
-}
-
 // Set the elapsed clock to a target (ms), keeping pause state consistent.
 function setElapsed(targetMs) {
   const target = Math.max(0, targetMs);
@@ -305,21 +312,6 @@ function nudgeClock(deltaMs) {
   if ('vibrate' in navigator) navigator.vibrate(15);
   saveRun();
   refresh();
-}
-// When only ONE dish still has unfinished timed steps, there's nothing to keep
-// in sync — so completing a step early jumps the clock to that dish's next step
-// instead of idling.
-function maybeJumpAhead() {
-  const prog = computeProgress();
-  const remaining = prog.dishes.filter((d) => d.included && d.steps &&
-    d.steps.some((s) => !s.prep && !s.redundant && s.state !== 'done' && s.state !== 'shared-done'));
-  if (remaining.length !== 1) return;
-  let soonest = null;
-  for (const s of remaining[0].steps) {
-    if (s.prep || s.redundant || s.state !== 'waiting') continue;
-    if (soonest == null || s.projStart < soonest) soonest = s.projStart;
-  }
-  if (soonest != null && soonest > prog.elapsed) setElapsed(soonest);
 }
 // Toggle completion (used by prep checkboxes). Prep can be done ANY time — even
 // before "Start cooking" — so this doesn't require the timed clock to be running.
@@ -624,7 +616,8 @@ function renderGantt(prog) {
     }
   }
 
-  // Timed action bar: the current timed task (with Done), or a wait message.
+  // Timed action bar: the current timed task + its live countdown (the timeline
+  // advances on its own — no tap needed), or a wait message.
   let bar = '';
   if (run.started && !prog.allDone) {
     const ta = prog.timedActions[0];
@@ -639,7 +632,6 @@ function renderGantt(prog) {
         <span class="tn-emoji">${escapeHtml(ta.dish.emoji)}</span>
         <span class="tn-text"><b>${escapeHtml(s.label)}${s.shareCount > 1 ? ` <span class="ahead-tag shared-tag">shared ×${s.shareCount}</span>` : ''}</b><small>${escapeHtml(ta.dish.name)}</small></span>
         <span class="tn-count${over ? ' over' : ''}">${over ? 'go' : fmtDur(remain)}</span>
-        <button class="btn primary tn-done" id="timed-done" data-id="${escapeHtml(ta.dish.id)}" data-si="${s.si}">✓ Done</button>
       </div>${nextLine}`;
     } else {
       bar = nextUp
@@ -822,8 +814,6 @@ el.hero.addEventListener('click', (e) => {
   if (chk) { toggleStepDone(chk.dataset.id, +chk.dataset.si); return; }
 });
 el.gantt.addEventListener('click', (e) => {
-  const td = e.target.closest('#timed-done');
-  if (td) { markDone(td.dataset.id, +td.dataset.si); return; }
   if (e.target.closest('#start-btn')) { startMeal(); return; }
   if (e.target.closest('#rew-btn')) { nudgeClock(-15000); return; }
   if (e.target.closest('#ff-btn')) { nudgeClock(15000); return; }

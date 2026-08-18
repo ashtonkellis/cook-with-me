@@ -30,8 +30,10 @@ console.log('prep order (dish order — chicken, rice, rice, veggies):', JSON.st
 
 // BOTTOM: Start cooking button, no timed bar yet.
 console.log('start-cooking button present:', !!(await page.$('#start-btn')),
-  '| timed bar yet:', !!(await page.$('#timed-done')),
+  '| timed bar yet:', !!(await page.$('.timed-now.go')),
   '| gantt lanes:', await page.$$eval('.gantt-row', (n) => n.length));
+// Timed steps complete by the clock now — there's no manual "Done" button.
+console.log('no timed Done button (removed):', !(await page.$('#timed-done')));
 // "Choose dishes" is gone from the Gantt (header icon only), and the footer
 // "Load example meal" link is removed.
 console.log('gantt choose-btn removed:', !(await page.$('#choose-btn')),
@@ -52,7 +54,7 @@ await page.screenshot({ path: 'tools/shot-idle.png' });
 await page.click('.prep-todo .pt-item:first-child .pt-check');
 await page.waitForTimeout(120);
 console.log('after prepping 1 dish (before cooking) -> prep-ready lanes:', await page.$$eval('.gantt-row.prep-ready', (n) => n.length),
-  '| still not cooking:', !(await page.$('#timed-done')));
+  '| still not cooking:', !(await page.$('#pp-btn')));
 
 // Complete all remaining prep via the checkboxes.
 let clicks = 0;
@@ -100,10 +102,17 @@ await page.click('.gantt-row:first-child .gseg');
 await page.waitForTimeout(100);
 console.log('tapped step detail:', (await page.$eval('.gantt-detail', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim());
 
-// Complete a timed task.
-await page.click('#timed-done');
-await page.waitForTimeout(150);
-console.log('after a timed task -> done blocks:', await page.$$eval('.gseg.done', (n) => n.length));
+// Timed steps auto-complete by the wall clock (no Done button). Jump the clock
+// ~6 min in and confirm the first timed step's block flips to done on its own.
+await page.evaluate(() => {
+  const run = JSON.parse(localStorage.getItem('cook-with-me:run'));
+  run.runningSince = null; run.accumMs = 6 * 60 * 1000;   // 6 min in, paused
+  localStorage.setItem('cook-with-me:run', JSON.stringify(run));
+});
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(250);
+console.log('timed step auto-done by clock:', await page.$$eval('.gseg.done', (n) => n.length), '(>=1 expected)',
+  '| still no Done button:', !(await page.$('#timed-done')));
 
 // Persistence: prep + start survive reload.
 await page.reload({ waitUntil: 'networkidle' });
@@ -131,12 +140,19 @@ await page.click('#picker-done').catch(() => {});
 await page.waitForTimeout(120);
 console.log('no-prep dish prep-ready:', await page.$$eval('.gantt-row.prep-ready', (n) => n.length), '(expect 1, rice)');
 
-// Jump-ahead: single dish, start, complete first timed step early -> clock jumps.
-await page.click('#start-btn'); await page.waitForTimeout(300);
-const flagBefore = await page.$eval('.now-flag', (n) => n.textContent).catch(() => '?');
-await page.click('#timed-done'); await page.waitForTimeout(200);
-const flagAfter = await page.$eval('.now-flag', (n) => n.textContent).catch(() => '?');
-console.log('jump-ahead (1 dish) clock:', flagBefore, '->', flagAfter, '(should jump forward)');
+// Single all-timed dish: start, run the clock past its timeline -> it finishes
+// on its own (no manual completion).
+await page.click('#start-btn'); await page.waitForTimeout(200);
+await page.evaluate(() => {
+  const run = JSON.parse(localStorage.getItem('cook-with-me:run'));
+  run.runningSince = null; run.accumMs = 30 * 60 * 1000;   // well past rice's ~16 min
+  localStorage.setItem('cook-with-me:run', JSON.stringify(run));
+});
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(200);
+await page.click('#picker-done').catch(() => {});
+await page.waitForTimeout(120);
+console.log('single dish auto-completes by clock:', (await page.$eval('.timed-now.alldone', (n) => n.textContent).catch(() => '(none)')).trim());
 
 // Reset the default meal for a clean state.
 await page.evaluate(() => {
@@ -147,11 +163,13 @@ await page.evaluate(() => {
   localStorage.setItem('cook-with-me:meal', JSON.stringify(m));
 });
 
-// Done state.
+// Done state: prep ticked off (manual) + clock past the whole timeline -> the
+// meal reads as ready.
 await page.evaluate(() => {
-  const doneSteps = {}; const counts = { chicken: 4, rice: 3, veggies: 3 };
-  for (const id in counts) for (let i = 0; i < counts[id]; i++) doneSteps[`${id}:${i}`] = 1000;
-  localStorage.setItem('cook-with-me:run', JSON.stringify({ started: true, runningSince: Date.now() - 60000, accumMs: 0, doneSteps }));
+  const m = JSON.parse(localStorage.getItem('cook-with-me:meal'));
+  const doneSteps = {};
+  for (const d of m.dishes) d.steps.forEach((s, si) => { if (s.prep) doneSteps[`${d.id}:${si}`] = 1000; });
+  localStorage.setItem('cook-with-me:run', JSON.stringify({ started: true, runningSince: null, accumMs: 60 * 60 * 1000, doneSteps }));
 });
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(200);
