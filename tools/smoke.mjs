@@ -92,10 +92,16 @@ const ends = await page.$$eval('.gantt-row', (rows) => rows.filter((r) => r.quer
   return Math.round((parseFloat(last.style.left) + parseFloat(last.style.width)) * 10) / 10;
 }));
 console.log('dish end % (all 100):', JSON.stringify(ends), '=>', ends.length === 3 && ends.every((e) => Math.abs(e - 100) < 0.5) ? 'FINISH TOGETHER ✓' : 'CHECK');
-// Total time EXCLUDES prep: longest timed-only dish is BBQ chicken (5+8+8=21m);
-// prep minutes (chicken 5, rice 3+3, veggies 6) must not inflate the total.
-const axisEnd = (await page.$eval('.ax-end', (n) => n.textContent).catch(() => '')).trim();
-console.log('total time (prep excluded):', axisEnd, '=>', /21:00/.test(axisEnd) ? 'OK (21:00)' : 'CHECK');
+// Total time EXCLUDES prep: only TIMED steps get Gantt blocks. BBQ chicken has
+// exactly 3 timed blocks (5+8+8=21m = the meal total) starting at 0% — its 5m
+// prep is NOT a block, so it doesn't inflate the timeline.
+const chick = await page.$$eval('.gantt-row', (rows) => {
+  const r = rows.find((x) => /BBQ chicken/.test(x.querySelector('.gn')?.textContent || ''));
+  const segs = [...r.querySelectorAll('.gseg')];
+  return { blocks: segs.length, firstLeft: Math.round(parseFloat(segs[0].style.left)) };
+});
+console.log('prep excluded from timeline: BBQ chicken timed blocks =', chick.blocks, '(expect 3), first block left =', chick.firstLeft + '%',
+  chick.blocks === 3 && chick.firstLeft === 0 ? 'OK ✓' : 'CHECK');
 
 // START COOKING.
 await page.click('#start-btn');
@@ -145,6 +151,23 @@ console.log('timed step auto-done by clock:', await page.$$eval('.gseg.done', (n
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
 console.log('after reload -> prep done items:', await page.$$eval('.pt-item.done', (n) => n.length), '| cooking:', !!(await page.$('#pp-btn')));
+
+// Picker works MID-COOK: deselecting a dish is allowed (bug fix — it used to be
+// blocked once started) and changing the selection RESETS the run (timers + prep
+// checkboxes) to a clean, not-started state.
+await page.click('#choose-top'); await page.waitForTimeout(150);
+const onBefore = await page.$$eval('.pick-row.on', (n) => n.length);
+await page.click('.pick-row:first-child'); await page.waitForTimeout(150);
+const onAfter = await page.$$eval('.pick-row.on', (n) => n.length);
+console.log('picker deselect while cooking:', onBefore, '->', onAfter, onAfter < onBefore ? 'WORKS ✓' : 'BLOCKED');
+await page.click('#picker-done'); await page.waitForTimeout(150);
+console.log('reselect resets run: cooking stopped:', !(await page.$('#pp-btn')),
+  '| checkboxes cleared:', (await page.$$eval('.pt-item.done', (n) => n.length)) === 0,
+  '| Start btn back:', !!(await page.$('#start-btn')));
+// Restore all 3 dishes for the checks below.
+await page.click('#choose-top'); await page.waitForTimeout(120);
+for (const r of await page.$$('.pick-row:not(.on)')) { await r.click(); await page.waitForTimeout(60); }
+await page.click('#picker-done'); await page.waitForTimeout(120);
 
 // Editing is fully removed — no gear button, no editor modal, no picker "Edit".
 console.log('editor removed:', !(await page.$('#edit-btn')) && !(await page.$('#editor')),

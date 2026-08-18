@@ -129,15 +129,16 @@ function computeSchedule(m) {
   return { dishes, mealMs, includedCount: included.length };
 }
 
-// Toggle a dish in/out of the meal (only before the meal has started).
+// Toggle a dish in/out of the meal. Changing the selection defines a different
+// meal, so it always resets the run — timers AND prep checkboxes — to a clean
+// state (this also means the picker works even mid-cook, not just before start).
 function toggleDish(id) {
-  if (run.started) return;
   const d = meal.dishes.find((x) => x.id === id);
   if (!d) return;
   d.included = !(d.included !== false);
   saveSelection();
   schedule = computeSchedule(meal);
-  render();
+  resetMeal(); // clears run (timers) + doneSteps (checkboxes), stops the clock, re-renders
 }
 
 // Flat, time-ordered list of every step-start across all dishes.
@@ -705,7 +706,6 @@ function renderGantt(prog) {
       </div>`;
   }
 
-  const total = fmtDur(scaleMs);
   el.gantt.innerHTML = `
     <div class="gantt-head">
       <span class="gantt-title">Meal timeline</span>
@@ -716,8 +716,7 @@ function renderGantt(prog) {
     <div class="gantt-rows">
       ${rows || `<div class="gantt-empty">Choose dishes to see the timeline.</div>`}
       ${nowLayer}
-    </div>
-    <div class="gantt-axis"><span>0:00</span><span class="ax-end">Serve · ${total}</span></div>`;
+    </div>`;
 }
 
 // ---------- Alerts (sound + vibration + notification) ----------

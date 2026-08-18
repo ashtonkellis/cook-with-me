@@ -20,6 +20,15 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Picker deselect/reset + Gantt fill + axis removal (V24)** —
+  - **Fixed can't-deselect in the picker**: `toggleDish` no longer bails when a
+    meal is started, so the picker works any time (the guard was blocking all
+    toggles once cooking had begun).
+  - **Changing the dish selection now resets the run** — timers AND prep
+    checkboxes — to a clean, not-started state.
+  - **Removed the bottom axis** (`0:00` / `Serve · 21:00`).
+  - **Gantt fills the screen**: lanes are `flex: 1 1 0` and grow to use the
+    vertical space (taller tracks, capped ~46px), no big empty gaps, no scroll.
 - [x] **Gantt sort, fill, casing, double-tap, stale-cache fix (V23)** —
   - **Gantt lanes now sort by cook-start time** (earliest-starting dish on top),
     so Stir-fried veggies (starts 8 min in) sits ABOVE Rice (11 min in). The prep

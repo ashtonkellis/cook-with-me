@@ -356,8 +356,7 @@ main {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-evenly;  /* fill the timeline area — spread lanes evenly */
-  gap: 6px;
+  gap: 8px;
   padding: 2px 0;
   overflow: hidden;               /* every lane stays visible — never scroll */
 }
@@ -367,7 +366,9 @@ main {
   column-gap: var(--gap);
   align-items: center;
   min-height: 28px;
-  flex: none;
+  /* Lanes grow to share the timeline area, so the chart fills the screen
+     instead of floating with a big empty gap. */
+  flex: 1 1 0;
 }
 .gantt-row.excluded { opacity: 0.5; }
 .gantt-label { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -405,7 +406,10 @@ main {
 
 .gantt-track {
   position: relative;
-  height: 30px;
+  height: 100%;
+  max-height: 46px;
+  min-height: 30px;
+  align-self: center;
   background: var(--track);
   border-radius: 8px;
   overflow: hidden;
@@ -463,15 +467,6 @@ main {
   background: #fff; border-radius: 5px; padding: 1px 5px;
   white-space: nowrap; font-variant-numeric: tabular-nums;
 }
-.gantt-axis {
-  flex: none;
-  display: flex; justify-content: space-between;
-  padding-left: calc(var(--label-w) + var(--gap));
-  margin-top: 6px;
-  font-size: 0.68rem; color: var(--muted);
-}
-.gantt-axis .ax-end { color: var(--done); font-weight: 600; }
-
 /* ---- Buttons ---- */
 .btn {
   font-size: 1rem;

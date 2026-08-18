@@ -84,12 +84,18 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
   — never the dish content — so stale/old saved meals (and any leftover test
   dishes) can't reappear. `loadMeal()` deep-copies the seed and overlays the
   saved selection; legacy `cook-with-me:meal` / `:migrated` keys are purged on
-  load. The picker (🍽️ header icon) only toggles which dishes are included.
+  load. The picker (🍽️ header icon) toggles which dishes are included and works
+  ANY time (even mid-cook); **changing the selection resets the run** (timers +
+  prep checkboxes) via `resetMeal()`, since a new selection is a different meal.
 - **Prep list collapses when done**: the top prep to-do list shows full detail
   (dish, duration, note per row) while prep is pending; once all prep is checked
   off it collapses to a compact checklist so the Gantt gets the room back.
 - **Gantt step detail**: tapping a step block opens a `.step-detail` panel
   (emoji, label, status pill, scheduled clock window, full note, Close).
+- **Gantt fills the screen**: `.gantt-row`s are `flex: 1 1 0` so the lanes grow
+  to share the timeline area (tracks are `height: 100%` capped at ~46px), and
+  `.gantt-rows` is `overflow: hidden` — all lanes visible, never scroll. There is
+  no bottom axis row (the old `0:00 / Serve · N` was removed).
 - **Progress model**: `computeProgress()` projects each step onto the shared
   timeline (a two-pass build) and derives states. **Timed steps complete
   automatically as the wall clock passes their scheduled end** — there is no
