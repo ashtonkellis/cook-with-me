@@ -20,6 +20,13 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Fix step-detail reflow + Gantt fill (V26)** —
+  - **Step-detail is now a floating overlay** (absolute inside the Gantt card),
+    so tapping a step's info no longer reflows/pushes the timeline lanes out of
+    view — they stay put behind the panel and return exactly on Close.
+  - **Gantt bars fill the lanes**: tracks grow with the (flex) lanes (capped
+    ~104px) instead of floating at a fixed 46px, so the chart fills the screen.
+    As a bonus this cleared the last of the iPhone-SE cooking clipping.
 - [x] **Collapse the prep section when all prep is done (V25)** — once every prep
       task is checked off, the top section collapses to just the "All prep done"
       banner plus a "▸ Show N prep steps" toggle; the individual items are hidden

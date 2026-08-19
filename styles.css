@@ -317,15 +317,21 @@ main {
   margin-left: auto; min-width: 0; text-align: right;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* Step-detail panel — opened by tapping a step block in the Gantt */
+/* Step-detail panel — a floating OVERLAY opened by tapping a step block. It is
+   absolutely positioned inside the (relative) Gantt card so it never reflows or
+   pushes the timeline lanes out of view; Close dismisses it. */
 .step-detail {
-  flex: none;
-  background: rgba(255, 255, 255, 0.06);
+  position: absolute;
+  left: 10px; right: 10px; top: 40px; bottom: 8px;
+  z-index: 6;
+  display: flex; flex-direction: column;
+  background: var(--card-2);
   border: 1px solid var(--line);
   border-left: 4px solid var(--active);
   border-radius: 13px;
-  padding: 12px 13px;
-  margin-bottom: 10px;
+  padding: 13px 14px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
 }
 .sd-head { display: flex; align-items: flex-start; gap: 10px; }
 .sd-emoji {
@@ -349,9 +355,9 @@ main {
 .sd-note { margin: 8px 0 0; font-size: 0.9rem; line-height: 1.4; color: var(--ink); }
 .sd-note-empty { color: var(--muted); font-style: italic; }
 .sd-close {
-  margin-top: 11px; width: 100%; padding: 9px; border-radius: 10px;
-  background: transparent; border: 1px solid var(--line); color: var(--muted);
-  font-weight: 700; font-size: 0.85rem; cursor: pointer;
+  margin-top: auto; width: 100%; padding: 11px; border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); color: var(--ink);
+  font-weight: 700; font-size: 0.9rem; cursor: pointer;
   transition: transform 90ms ease, filter 90ms ease;
 }
 .sd-close:active { transform: scale(0.98); filter: brightness(1.2); }
@@ -416,7 +422,7 @@ main {
 .gantt-track {
   position: relative;
   height: 100%;
-  max-height: 46px;
+  max-height: 104px;   /* let bars grow to fill the lane so the chart fills the screen */
   min-height: 30px;
   align-self: center;
   background: var(--track);

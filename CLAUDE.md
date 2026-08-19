@@ -93,11 +93,14 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
   `#prep-toggle` ("▸ Show N prep steps") — the individual items are hidden until
   the user expands them (`prepExpanded`, in-memory), freeing the Gantt more room.
 - **Gantt step detail**: tapping a step block opens a `.step-detail` panel
-  (emoji, label, status pill, scheduled clock window, full note, Close).
+  (emoji, label, status pill, scheduled clock window, full note, Close). It is
+  an ABSOLUTE overlay inside the (relative) Gantt card, so it floats over the
+  timeline and never reflows/clips the lanes.
 - **Gantt fills the screen**: `.gantt-row`s are `flex: 1 1 0` so the lanes grow
-  to share the timeline area (tracks are `height: 100%` capped at ~46px), and
-  `.gantt-rows` is `overflow: hidden` — all lanes visible, never scroll. There is
-  no bottom axis row (the old `0:00 / Serve · N` was removed).
+  to share the timeline area, and the tracks (`height: 100%`, capped ~104px)
+  grow with them so the bars fill the lanes instead of floating. `.gantt-rows`
+  is `overflow: hidden` — all lanes visible, never scroll. There is no bottom
+  axis row (the old `0:00 / Serve · N` was removed).
 - **Progress model**: `computeProgress()` projects each step onto the shared
   timeline (a two-pass build) and derives states. **Timed steps complete
   automatically as the wall clock passes their scheduled end** — there is no
