@@ -20,6 +20,11 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Rename thighs + add BBQ chicken breast (V27)** — renamed "BBQ chicken" to
+      "BBQ chicken thighs"; added "BBQ chicken breast" with the same steps but a
+      9-min cook time per side (thighs are 8). Breast is `included: false` by
+      default (an alternative to thighs — available in the picker). Both chicken
+      dishes share "Preheat BBQ", so it's done once when both are in the meal.
 - [x] **Fix step-detail reflow + Gantt fill (V26)** —
   - **Step-detail is now a floating overlay** (absolute inside the Gantt card),
     so tapping a step's info no longer reflows/pushes the timeline lanes out of

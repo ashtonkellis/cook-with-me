@@ -12,12 +12,21 @@ const EXAMPLE_MEAL = {
   name: 'BBQ dinner',
   dishes: [
     {
-      id: 'chicken', name: 'BBQ chicken', emoji: '🍗', included: true,
+      id: 'chicken', name: 'BBQ chicken thighs', emoji: '🍗', included: true,
       steps: [
         { label: 'Prep & season chicken', minutes: 5, prep: true, note: 'Pat dry, salt + rub, bring to room temp.' },
         { label: 'Preheat BBQ', minutes: 5, shared: true, note: 'Medium-high, ~450°F. Oil the grates.' },
         { label: 'Cook side 1', minutes: 8, note: 'Skin-side down. Don’t move them — let the skin crisp.' },
         { label: 'Cook side 2', minutes: 8, note: 'Flip once. Pull at 175°F internal.' },
+      ],
+    },
+    {
+      id: 'chicken-breast', name: 'BBQ chicken breast', emoji: '🍗', included: false,
+      steps: [
+        { label: 'Prep & season chicken', minutes: 5, prep: true, note: 'Pat dry, salt + rub, bring to room temp.' },
+        { label: 'Preheat BBQ', minutes: 5, shared: true, note: 'Medium-high, ~450°F. Oil the grates.' },
+        { label: 'Cook side 1', minutes: 9, note: 'Skin-side down. Don’t move them — let the skin crisp.' },
+        { label: 'Cook side 2', minutes: 9, note: 'Flip once. Pull at 175°F internal.' },
       ],
     },
     {

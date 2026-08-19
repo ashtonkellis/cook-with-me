@@ -75,8 +75,9 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
   - `shared` — same-labeled shared steps across included dishes are one physical
     task, owned by the earliest dish; redundant copies are skipped/auto-done.
   - `included` picks which dishes are in the meal (chosen in the picker modal).
-  Emoji is the per-dish "image". Seeded meal: BBQ chicken, Rice, Stir-fried
-  veggies (all selected by default).
+  Emoji is the per-dish "image". Seed dishes: BBQ chicken thighs, BBQ chicken
+  breast (an alternative — `included: false` by default), Rice, Stir-fried
+  veggies. Both chicken dishes share "Preheat BBQ" (done once when both are in).
 - **The meal is code-sourced — there is NO in-app editor.** `EXAMPLE_MEAL` in
   `app.js` is the single source of truth for dish/step content; edit dishes by
   pushing changes to that file. The app persists ONLY the per-dish include/

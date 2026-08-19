@@ -12,10 +12,14 @@ await page.goto('http://localhost:8123/', { waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
 console.log('version shown:', (await page.textContent('#version')).trim());
 
-// Picker at startup: 3 dishes, all selected.
+// Picker at startup: 4 dishes in the library (thighs, breast, rice, veggies);
+// 3 selected by default (breast is an off-by-default alternative to thighs).
 console.log('picker at startup:', await page.isVisible('#picker .editor-panel'),
   '| dishes:', await page.$$eval('.pick-row', (n) => n.length),
   '| selected:', await page.$$eval('.pick-row.on', (n) => n.length));
+const dishLib = await page.$$eval('.pick-row .pick-name strong', (ns) => ns.map((n) => n.textContent.trim()));
+console.log('dish library:', JSON.stringify(dishLib),
+  /BBQ chicken thighs/.test(dishLib.join()) && /BBQ chicken breast/.test(dishLib.join()) ? 'OK ✓' : 'CHECK');
 // Toggle a dish off/on to persist the meal to localStorage (for later evals).
 await page.click('.pick-row:first-child'); await page.waitForTimeout(60);
 await page.click('.pick-row:first-child'); await page.waitForTimeout(60);
@@ -33,7 +37,7 @@ console.log('prep order (cook-start order):', JSON.stringify(prepOrder), JSON.st
 // Gantt lanes are sorted by cook-start time: veggies (starts 8m in) ABOVE rice
 // (starts 11m in), because veggies starts sooner.
 const laneOrder = await page.$$eval('.gantt-row .gn', (ns) => ns.map((n) => n.textContent.trim()));
-const laneExpect = JSON.stringify(['BBQ chicken', 'Stir-fried veggies', 'Rice']);
+const laneExpect = JSON.stringify(['BBQ chicken thighs', 'Stir-fried veggies', 'Rice']);
 console.log('gantt lane order (by start time):', JSON.stringify(laneOrder), JSON.stringify(laneOrder) === laneExpect ? 'OK ✓' : `EXPECTED ${laneExpect}`);
 
 // BOTTOM: Start cooking button, no timed bar yet.
@@ -174,10 +178,12 @@ await page.click('#picker-done'); await page.waitForTimeout(150);
 console.log('reselect resets run: cooking stopped:', !(await page.$('#pp-btn')),
   '| checkboxes cleared:', (await page.$$eval('.pt-item.done', (n) => n.length)) === 0,
   '| Start btn back:', !!(await page.$('#start-btn')));
-// Restore all 3 dishes for the checks below.
-await page.click('#choose-top'); await page.waitForTimeout(120);
-for (const r of await page.$$('.pick-row:not(.on)')) { await r.click(); await page.waitForTimeout(60); }
-await page.click('#picker-done'); await page.waitForTimeout(120);
+// Restore the default 3-dish selection for the checks below (set it directly —
+// toggling a picker row re-renders the list, so clicking looped handles is racy).
+await page.evaluate(() => localStorage.setItem('cook-with-me:included', JSON.stringify({ chicken: true, rice: true, veggies: true })));
+await page.reload({ waitUntil: 'networkidle' }); await page.waitForTimeout(150);
+await page.click('#picker-done').catch(() => {});
+await page.waitForTimeout(120);
 
 // Editing is fully removed — no gear button, no editor modal, no picker "Edit".
 console.log('editor removed:', !(await page.$('#edit-btn')) && !(await page.$('#editor')),
