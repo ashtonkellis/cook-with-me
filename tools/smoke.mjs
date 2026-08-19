@@ -77,6 +77,14 @@ while ((await page.$('.pt-item:not(.done) .pt-check')) && clicks < 8) {
 }
 console.log('all prep done -> prep-ready lanes (expect 3):', await page.$$eval('.gantt-row.prep-ready', (n) => n.length),
   '| prep-done banner:', !!(await page.$('.prep-done-banner')));
+// When all prep is done the section COLLAPSES: individual items hidden, a toggle
+// appears; expanding shows them again, collapsing hides them.
+console.log('prep collapsed when done: items hidden:', (await page.$$('.prep-todo .pt-item')).length === 0,
+  '| toggle shown:', !!(await page.$('#prep-toggle')));
+await page.click('#prep-toggle'); await page.waitForTimeout(120);
+console.log('expand toggle -> items shown:', (await page.$$('.prep-todo .pt-item')).length);
+await page.click('#prep-toggle'); await page.waitForTimeout(120);
+console.log('collapse toggle -> items hidden:', (await page.$$('.prep-todo .pt-item')).length === 0);
 // Calculated done time is shown.
 console.log('done-time shown:', (await page.$eval('.gantt-sub', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim());
 // Header "choose dishes" icon opens the picker.
@@ -150,7 +158,9 @@ console.log('timed step auto-done by clock:', await page.$$eval('.gseg.done', (n
 // Persistence: prep + start survive reload.
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-console.log('after reload -> prep done items:', await page.$$eval('.pt-item.done', (n) => n.length), '| cooking:', !!(await page.$('#pp-btn')));
+// Prep survives reload (the section is collapsed since all 4 are done, so read
+// the "4/4 prep done" summary rather than the hidden rows).
+console.log('after reload -> prep summary:', (await page.$eval('.hero-clock', (n) => n.textContent).catch(() => '(none)')).trim(), '| cooking:', !!(await page.$('#pp-btn')));
 
 // Picker works MID-COOK: deselecting a dish is allowed (bug fix — it used to be
 // blocked once started) and changing the selection RESETS the run (timers + prep

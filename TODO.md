@@ -20,6 +20,11 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Collapse the prep section when all prep is done (V25)** — once every prep
+      task is checked off, the top section collapses to just the "All prep done"
+      banner plus a "▸ Show N prep steps" toggle; the individual items are hidden
+      until the user expands them (and can collapse again). Frees the Gantt even
+      more room. While prep is still pending, the full detailed list always shows.
 - [x] **Picker deselect/reset + Gantt fill + axis removal (V24)** —
   - **Fixed can't-deselect in the picker**: `toggleDish` no longer bails when a
     meal is started, so the picker works any time (the guard was blocking all

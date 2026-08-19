@@ -88,8 +88,10 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
   ANY time (even mid-cook); **changing the selection resets the run** (timers +
   prep checkboxes) via `resetMeal()`, since a new selection is a different meal.
 - **Prep list collapses when done**: the top prep to-do list shows full detail
-  (dish, duration, note per row) while prep is pending; once all prep is checked
-  off it collapses to a compact checklist so the Gantt gets the room back.
+  (dish, duration, note per row) while prep is pending; once ALL prep is checked
+  off the section collapses to just the "All prep done" banner + a
+  `#prep-toggle` ("▸ Show N prep steps") — the individual items are hidden until
+  the user expands them (`prepExpanded`, in-memory), freeing the Gantt more room.
 - **Gantt step detail**: tapping a step block opens a `.step-detail` panel
   (emoji, label, status pill, scheduled clock window, full note, Close).
 - **Gantt fills the screen**: `.gantt-row`s are `flex: 1 1 0` so the lanes grow

@@ -59,6 +59,7 @@ let lastActiveKeys = new Set(); // step keys currently available (for new-task c
 let mealDoneNotified = false;
 let tickHandle = null;
 let selected = null;          // { di, si } — Gantt block tapped to inspect its note
+let prepExpanded = false;     // when all prep is done, show the collapsed list?
 
 // ---------- Elements ----------
 const el = {
@@ -483,13 +484,23 @@ function renderHero(prog) {
   const banner = allPrepDone
     ? `<div class="prep-done-banner">✅ All prep done — ready to cook!${run.started ? '' : ' Tap ▶ Start cooking below.'}</div>`
     : '';
+  // Once all prep is done the section collapses to just the banner (+ a toggle);
+  // the individual items are hidden until the user expands them. While prep is
+  // still pending the full list always shows.
+  const showList = !allPrepDone || prepExpanded;
+  const n = prog.prepTotal;
+  const toggle = allPrepDone
+    ? `<button class="prep-toggle" id="prep-toggle" aria-expanded="${prepExpanded}">${prepExpanded ? '▾ Hide prep steps' : `▸ Show ${n} prep step${n === 1 ? '' : 's'}`}</button>`
+    : '';
+  const list = showList ? `<ul class="prep-todo${collapsed ? ' compact' : ''}">${items}</ul>` : '';
   el.hero.innerHTML = `
     <div class="hero-top">
       <span class="hero-label">🔪 Prep — do any time</span>
       <span class="hero-clock">${prog.prepDone}/${prog.prepTotal} prep done</span>
     </div>
     ${banner}
-    <ul class="prep-todo${collapsed ? ' compact' : ''}">${items}</ul>`;
+    ${toggle}
+    ${list}`;
 }
 
 // Distinct hue per dish; steps within a dish graduate in lightness so each
@@ -760,6 +771,7 @@ function notify(title, body) {
 // Prep to-do list: tap anywhere on a row to toggle it complete (the whole row
 // is the tap target, not just the checkbox — easier to hit on touch).
 el.hero.addEventListener('click', (e) => {
+  if (e.target.closest('#prep-toggle')) { prepExpanded = !prepExpanded; render(); return; }
   const row = e.target.closest('.pt-item');
   if (!row) return;
   const chk = row.querySelector('.pt-check');

@@ -166,6 +166,15 @@ main {
   font-weight: 700; font-size: 0.9rem;
   padding: 9px 12px; border-radius: 11px; margin: 8px 0;
 }
+/* Expand/collapse toggle for the completed prep checklist */
+.prep-toggle {
+  flex: none; align-self: flex-start;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--muted); font-weight: 700; font-size: 0.82rem;
+  padding: 4px 2px; margin: 2px 0 0;
+  transition: filter 90ms ease;
+}
+.prep-toggle:active { filter: brightness(1.3); }
 
 /* A dish whose prep (precursor steps) is all done turns clearly green in the
    Gantt — a tinted lane, a green left accent bar, and a filled "Prep done" pill. */
