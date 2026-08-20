@@ -20,6 +20,13 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Remove completed prep from the list + shrink-to-fit Gantt (V28)** —
+  - Completing a prep task now **removes it from the list** (only pending tasks
+    show); done tasks live behind a **"▸ Show N completed"** toggle. The list
+    shrinks as you work, which frees the Gantt more room.
+  - **Gantt lanes shrink to fit** (`flex: 1 1 0; min-height: 0`, `overflow:
+    hidden`) so every dish stays visible with no scrollbar, however many are
+    selected — and grow to fill the screen when there's room.
 - [x] **Rename thighs + add BBQ chicken breast (V27)** — renamed "BBQ chicken" to
       "BBQ chicken thighs"; added "BBQ chicken breast" with the same steps but a
       9-min cook time per side (thighs are 8). Breast is `included: false` by

@@ -88,20 +88,23 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
   load. The picker (🍽️ header icon) toggles which dishes are included and works
   ANY time (even mid-cook); **changing the selection resets the run** (timers +
   prep checkboxes) via `resetMeal()`, since a new selection is a different meal.
-- **Prep list collapses when done**: the top prep to-do list shows full detail
-  (dish, duration, note per row) while prep is pending; once ALL prep is checked
-  off the section collapses to just the "All prep done" banner + a
-  `#prep-toggle` ("▸ Show N prep steps") — the individual items are hidden until
-  the user expands them (`prepExpanded`, in-memory), freeing the Gantt more room.
+- **Completed prep is removed from the list**: the top prep to-do shows only
+  PENDING tasks (full detail — dish, duration, note); completing one drops it
+  from the list, so the list shrinks as you work and frees the Gantt more room.
+  Done tasks live behind a `#prep-toggle` ("▸ Show N completed", `prepExpanded`
+  in-memory) that reveals them (compact, struck-through) in a `.done-list`. When
+  all prep is done the pending list is empty and only the "All prep done" banner
+  + toggle remain.
 - **Gantt step detail**: tapping a step block opens a `.step-detail` panel
   (emoji, label, status pill, scheduled clock window, full note, Close). It is
   an ABSOLUTE overlay inside the (relative) Gantt card, so it floats over the
   timeline and never reflows/clips the lanes.
-- **Gantt fills the screen**: `.gantt-row`s are `flex: 1 1 0` so the lanes grow
-  to share the timeline area, and the tracks (`height: 100%`, capped ~104px)
-  grow with them so the bars fill the lanes instead of floating. `.gantt-rows`
-  is `overflow: hidden` — all lanes visible, never scroll. There is no bottom
-  axis row (the old `0:00 / Serve · N` was removed).
+- **Gantt fills the screen & shrinks to fit**: `.gantt-row`s are `flex: 1 1 0`
+  with `min-height: 0`, so the lanes grow to share the timeline area AND shrink
+  so every dish stays visible without a scrollbar, however many are selected.
+  The tracks (`height: 100%`, capped ~104px) grow with them so the bars fill the
+  lanes. `.gantt-rows` is `overflow: hidden` — all lanes visible, never scroll.
+  There is no bottom axis row (the old `0:00 / Serve · N` was removed).
 - **Progress model**: `computeProgress()` projects each step onto the shared
   timeline (a two-pass build) and derives states. **Timed steps complete
   automatically as the wall clock passes their scheduled end** — there is no

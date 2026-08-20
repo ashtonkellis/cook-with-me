@@ -380,10 +380,10 @@ main {
   grid-template-columns: var(--label-w) 1fr;
   column-gap: var(--gap);
   align-items: center;
-  min-height: 28px;
-  /* Lanes grow to share the timeline area, so the chart fills the screen
-     instead of floating with a big empty gap. */
+  /* Lanes grow to share the timeline area (fill the screen) AND shrink to fit so
+     every dish stays visible without a scrollbar, however many are selected. */
   flex: 1 1 0;
+  min-height: 0;
 }
 .gantt-row.excluded { opacity: 0.5; }
 .gantt-label { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -401,16 +401,19 @@ main {
 }
 .dish-check.on { background: var(--done); border-color: var(--done); }
 .dish-check:active { transform: scale(0.92); }
-.gantt-label .gtxt { min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+.gantt-label .gtxt { min-width: 0; display: flex; flex-direction: column; line-height: 1.12; }
 .gantt-label .gn {
   font-size: 0.82rem; font-weight: 600;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.gantt-label .gs { font-size: 0.7rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.gantt-label .gs {
+  font-size: 0.7rem; color: var(--muted); font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .gantt-label .gs.cook { color: var(--active); font-weight: 700; }
 .gantt-label .gs.done { color: var(--done); font-weight: 700; }
 .gantt-label .gs.off { color: var(--muted); opacity: 0.8; }
-.lane-prep { font-size: 0.62rem; font-weight: 700; color: var(--muted); letter-spacing: 0.01em; }
+.lane-prep { font-size: 0.62rem; font-weight: 700; color: var(--muted); letter-spacing: 0.01em; flex: none; white-space: nowrap; }
 .lane-prep.done {
   color: #05261a; background: var(--done);
   padding: 1px 7px; border-radius: 999px; font-weight: 800;
@@ -423,7 +426,7 @@ main {
   position: relative;
   height: 100%;
   max-height: 104px;   /* let bars grow to fill the lane so the chart fills the screen */
-  min-height: 30px;
+  min-height: 22px;
   align-self: center;
   background: var(--track);
   border-radius: 8px;
@@ -666,10 +669,8 @@ main {
     overflow: hidden; margin-top: 1px;
   }
   .gantt-card { min-height: 150px; }
-  .gantt-row { min-height: 24px; }
   .hero { padding: 10px 16px; }
   #start-btn { padding: 10px; }
-  .gantt-rows { gap: 3px; }
-  .gantt-axis { margin-top: 2px; }
+  .gantt-rows { gap: 4px; }
   .lane-prep { font-size: 0.58rem; }
 }

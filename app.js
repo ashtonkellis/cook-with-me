@@ -468,17 +468,16 @@ function renderHero(prog) {
     return;
   }
 
-  // Full detail (emoji, duration, note per row) while prep is still pending — the
-  // planning phase. Once ALL prep is done the list collapses to a compact
-  // checklist so the timeline below gets the room.
-  const allPrepDone = prog.prepTotal > 0 && prog.prepDone === prog.prepTotal;
-  const collapsed = allPrepDone;
+  // Completing a prep task REMOVES it from the visible list — only pending tasks
+  // show (full detail: dish, duration, note). Completed tasks are tucked behind a
+  // "Show N completed" toggle. This keeps the list shrinking as you work, freeing
+  // the timeline room.
   const currentKey = prog.prepPending[0] ? prog.prepPending[0].key : null;
-  const items = prepAll.map((p) => {
-    const isCur = p.key === currentKey;
+  const renderItem = (p, compact) => {
     const s = p.step;
+    const isCur = !compact && p.key === currentKey;
     const len = fmtLen(s.lenMs || (s.minutes * MIN));
-    const noteLine = (!collapsed && s.note) ? `<span class="pt-note">📝 ${escapeHtml(s.note)}</span>` : '';
+    const noteLine = (!compact && s.note) ? `<span class="pt-note">📝 ${escapeHtml(s.note)}</span>` : '';
     return `
       <li class="pt-item${p.done ? ' done' : ''}${isCur ? ' current' : ''}">
         <button class="pt-check" data-id="${escapeHtml(p.dish.id)}" data-si="${p.si}" aria-label="${p.done ? 'Undo' : 'Complete'} ${escapeHtml(s.label)}">${p.done ? '✓' : ''}</button>
@@ -489,27 +488,34 @@ function renderHero(prog) {
           ${noteLine}
         </span>
       </li>`;
-  }).join('');
+  };
+
+  const pending = prepAll.filter((p) => !p.done);
+  const completed = prepAll.filter((p) => p.done);
+  const allPrepDone = prog.prepTotal > 0 && prog.prepDone === prog.prepTotal;
+
   const banner = allPrepDone
     ? `<div class="prep-done-banner">✅ All prep done — ready to cook!${run.started ? '' : ' Tap ▶ Start cooking below.'}</div>`
     : '';
-  // Once all prep is done the section collapses to just the banner (+ a toggle);
-  // the individual items are hidden until the user expands them. While prep is
-  // still pending the full list always shows.
-  const showList = !allPrepDone || prepExpanded;
-  const n = prog.prepTotal;
-  const toggle = allPrepDone
-    ? `<button class="prep-toggle" id="prep-toggle" aria-expanded="${prepExpanded}">${prepExpanded ? '▾ Hide prep steps' : `▸ Show ${n} prep step${n === 1 ? '' : 's'}`}</button>`
+  const pendingList = pending.length
+    ? `<ul class="prep-todo">${pending.map((p) => renderItem(p, false)).join('')}</ul>`
     : '';
-  const list = showList ? `<ul class="prep-todo${collapsed ? ' compact' : ''}">${items}</ul>` : '';
+  const c = completed.length;
+  const toggle = c
+    ? `<button class="prep-toggle" id="prep-toggle" aria-expanded="${prepExpanded}">${prepExpanded ? '▾ Hide completed' : `▸ Show ${c} completed`}</button>`
+    : '';
+  const completedList = (prepExpanded && c)
+    ? `<ul class="prep-todo compact done-list">${completed.map((p) => renderItem(p, true)).join('')}</ul>`
+    : '';
   el.hero.innerHTML = `
     <div class="hero-top">
       <span class="hero-label">🔪 Prep — do any time</span>
       <span class="hero-clock">${prog.prepDone}/${prog.prepTotal} prep done</span>
     </div>
     ${banner}
+    ${pendingList}
     ${toggle}
-    ${list}`;
+    ${completedList}`;
 }
 
 // Distinct hue per dish; steps within a dish graduate in lightness so each

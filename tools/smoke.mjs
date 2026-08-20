@@ -51,12 +51,21 @@ console.log('no timed Done button (removed):', !(await page.$('#timed-done')));
 console.log('gantt choose-btn removed:', !(await page.$('#choose-btn')),
   '| footer load-example removed:', !(await page.$('#reset-example')),
   '| meal-done countdown:', /start now|ready in/.test(await page.$eval('.gantt-sub', (n) => n.textContent).catch(() => '')));
-// Whole prep ROW is a tap target (not just the checkbox): tap the text and it toggles.
-await page.click('.prep-todo .pt-item:first-child .pt-text');
-await page.waitForTimeout(100);
-console.log('whole prep row tappable:', await page.$eval('.prep-todo .pt-item:first-child', (n) => n.classList.contains('done')));
-await page.click('.prep-todo .pt-item:first-child .pt-text');
-await page.waitForTimeout(100);
+// Completing a prep task (tap anywhere on the row) REMOVES it from the visible
+// list; a "Show N completed" toggle appears and reveals the done ones.
+const pend0 = (await page.$$('.prep-todo:not(.done-list) .pt-item')).length;
+await page.click('.prep-todo:not(.done-list) .pt-item:first-child .pt-text');
+await page.waitForTimeout(120);
+const pend1 = (await page.$$('.prep-todo:not(.done-list) .pt-item')).length;
+console.log('complete removes from list:', pend0, '->', pend1, pend1 === pend0 - 1 ? 'OK ✓' : 'CHECK',
+  '| show-completed toggle:', !!(await page.$('#prep-toggle')));
+await page.click('#prep-toggle'); await page.waitForTimeout(100);
+console.log('show completed -> revealed:', (await page.$$('.done-list .pt-item')).length);
+// Reset to a clean all-pending state for the checks below.
+await page.evaluate(() => { const r = JSON.parse(localStorage.getItem('cook-with-me:run')); r.doneSteps = {}; localStorage.setItem('cook-with-me:run', JSON.stringify(r)); });
+await page.reload({ waitUntil: 'networkidle' }); await page.waitForTimeout(150);
+await page.click('#picker-done').catch(() => {}); await page.waitForTimeout(100);
+console.log('reset -> pending items:', (await page.$$('.prep-todo:not(.done-list) .pt-item')).length);
 
 const scroll1 = await page.evaluate(() => ({ s: document.body.scrollHeight, c: document.documentElement.clientHeight }));
 console.log('idle no-scroll:', scroll1.s <= scroll1.c + 1 ? 'FITS' : `SCROLLS (${scroll1.s}>${scroll1.c})`);
@@ -69,7 +78,7 @@ console.log('idle no-clip:', !clip1.prep && !clip1.rows ? 'ALL VISIBLE ✓' : `C
 await page.screenshot({ path: 'tools/shot-idle.png' });
 
 // Prep can be done BEFORE cooking. Complete the first dish's prep -> its lane turns green.
-await page.click('.prep-todo .pt-item:first-child .pt-check');
+await page.click('.prep-todo:not(.done-list) .pt-item:first-child .pt-check');
 await page.waitForTimeout(120);
 console.log('after prepping 1 dish (before cooking) -> prep-ready lanes:', await page.$$eval('.gantt-row.prep-ready', (n) => n.length),
   '| still not cooking:', !(await page.$('#pp-btn')));
