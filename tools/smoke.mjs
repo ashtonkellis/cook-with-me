@@ -130,6 +130,10 @@ await page.waitForTimeout(400);
 console.log('after start -> now-line:', !!(await page.$('.gantt-nowline')),
   '| timed bar:', (await page.$eval('.timed-now', (n) => n.textContent).catch(() => '(none)')).replace(/\s+/g, ' ').trim(),
   '| pause btn:', !!(await page.$('#pp-btn')));
+// Reset moved to the header (🔄), removed from the bottom cooking controls.
+const bottomBtns = await page.$$eval('.cook-controls .btn', (bs) => bs.map((b) => b.textContent.trim()));
+console.log('header reset present:', !!(await page.$('#reset-top')),
+  '| bottom Reset removed:', !bottomBtns.some((t) => /^reset$/i.test(t)), '| controls:', JSON.stringify(bottomBtns));
 const scroll2 = await page.evaluate(() => ({ s: document.body.scrollHeight, c: document.documentElement.clientHeight }));
 console.log('cooking no-scroll:', scroll2.s <= scroll2.c + 1 ? 'FITS' : `SCROLLS (${scroll2.s}>${scroll2.c})`);
 const clip2 = await page.evaluate(() => {
@@ -226,6 +230,16 @@ await page.evaluate(() => {
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(200);
 console.log('done state:', (await page.$eval('.timed-now.alldone', (n) => n.textContent).catch(() => '(none)')).trim());
+
+// Header 🔄 Reset button: clicking it (accepting the confirm) resets the run.
+await page.evaluate(() => {
+  localStorage.setItem('cook-with-me:included', JSON.stringify({ chicken: true, rice: true, veggies: true }));
+  localStorage.setItem('cook-with-me:run', JSON.stringify({ started: true, runningSince: null, accumMs: 120000, doneSteps: { 'chicken:0': 1 } }));
+});
+await page.reload({ waitUntil: 'networkidle' }); await page.waitForTimeout(150);
+page.once('dialog', (d) => d.accept());
+await page.click('#reset-top'); await page.waitForTimeout(150);
+console.log('header reset works: cooking stopped:', !(await page.$('#pp-btn')), '| Start btn back:', !!(await page.$('#start-btn')));
 
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no console/page errors');
 await browser.close();

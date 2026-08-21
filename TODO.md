@@ -20,6 +20,11 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Move Reset to the header (V30)** — the Reset button is now a 🔄 icon in
+      the header next to the 🍽️ choose-dishes icon (`requestReset()`, confirms
+      unless nothing's started / already done). Removed from the bottom cooking
+      controls, which are now just ⏪15s / Pause / ⏩15s; the done state keeps its
+      full-width "Start over".
 - [x] **Fix app not filling the screen on device (V29)** — on device the app left
       empty space below the footer and crushed the Gantt lanes because `100dvh`
       resolves short in some iOS contexts (in-app browsers, standalone PWAs, older

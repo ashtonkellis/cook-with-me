@@ -75,6 +75,7 @@ const el = {
   hero: document.getElementById('hero'),
   gantt: document.getElementById('gantt'),
   chooseTop: document.getElementById('choose-top'),
+  resetTop: document.getElementById('reset-top'),
   picker: document.getElementById('picker'),
   pickerList: document.getElementById('picker-list'),
   pickerClose: document.getElementById('picker-close'),
@@ -369,6 +370,13 @@ function resetMeal() {
   saveRun();
   stopTicking();
   refresh();
+}
+// Reset entry point for the buttons: skip the confirm when there's nothing to
+// lose (fresh meal) or the meal's already done; otherwise ask first.
+function requestReset() {
+  const prog = computeProgress();
+  const hasProgress = run.started || prog.prepDone > 0;
+  if (!hasProgress || prog.allDone || confirm('Reset the whole meal — clear all timers and checkboxes?')) resetMeal();
 }
 
 function startTicking() {
@@ -727,7 +735,6 @@ function renderGantt(prog) {
       <div class="cook-controls">
         <button class="btn ghost sm" id="rew-btn" aria-label="Rewind 15 seconds">⏪ 15s</button>
         <button class="btn ${paused ? 'primary' : 'warn'}" id="pp-btn">${paused ? '▶ Resume' : '⏸ Pause'}</button>
-        <button class="btn ghost" id="reset-btn">Reset</button>
         <button class="btn ghost sm" id="ff-btn" aria-label="Fast-forward 15 seconds">15s ⏩</button>
       </div>`;
   }
@@ -797,10 +804,7 @@ el.gantt.addEventListener('click', (e) => {
   if (e.target.closest('#rew-btn')) { nudgeClock(-15000); return; }
   if (e.target.closest('#ff-btn')) { nudgeClock(15000); return; }
   if (e.target.closest('#pp-btn')) { isRunning() ? pauseMeal() : resumeMeal(); return; }
-  if (e.target.closest('#reset-btn')) {
-    if (isAllDone() || confirm('Reset the whole meal timer?')) resetMeal();
-    return;
-  }
+  if (e.target.closest('#reset-btn')) { requestReset(); return; }
   if (e.target.closest('#detail-close')) { selected = null; render(); return; }
   const seg = e.target.closest('.gseg');
   if (!seg) return;
@@ -810,6 +814,7 @@ el.gantt.addEventListener('click', (e) => {
 });
 
 el.chooseTop.addEventListener('click', openPicker);
+el.resetTop.addEventListener('click', requestReset);
 
 // ---------- Dish picker ----------
 function openPicker() { renderPicker(); el.picker.hidden = false; }

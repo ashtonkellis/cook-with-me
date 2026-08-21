@@ -88,6 +88,11 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
   load. The picker (🍽️ header icon) toggles which dishes are included and works
   ANY time (even mid-cook); **changing the selection resets the run** (timers +
   prep checkboxes) via `resetMeal()`, since a new selection is a different meal.
+- **Header actions**: two icon buttons top-right — 🍽️ (choose dishes) and 🔄
+  (Reset, `#reset-top` → `requestReset()`, which confirms unless nothing's
+  started / the meal's already done). Reset lives ONLY in the header now; the
+  bottom cooking controls are just ⏪15s / Pause / ⏩15s. The done state still
+  shows a full-width "Start over".
 - **Completed prep is removed from the list**: the top prep to-do shows only
   PENDING tasks (full detail — dish, duration, note); completing one drops it
   from the list, so the list shrinks as you work and frees the Gantt more room.
