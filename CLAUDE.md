@@ -123,8 +123,12 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
 - Match the Wing Weather visual language: dark stacked cards, status pills, a
   colored left accent bar per card, big tabular-nums countdowns.
 - Keep it dependency-free and buildless so GitHub Pages serves it as-is.
-- **One-screen fit (no scroll)**: `body` is `height: 100dvh; overflow: hidden`,
-  a flex column of header / `main` / footer. Inside `main`, the hero (prep) card
+- **One-screen fit (no scroll)**: `body` is `height: var(--app-h, 100dvh);
+  overflow: hidden`, a flex column of header / `main` / footer. `--app-h` is set
+  from `window.innerHeight` in JS (`syncAppHeight`, on load/resize/rotate/
+  foreground) because `100dvh` resolves SHORT in some iOS contexts (in-app
+  browsers, standalone PWAs, older Safari) — leaving a gap at the bottom and
+  crushing the timeline. Pinning to the real visible height fixes both. Inside `main`, the hero (prep) card
   is `flex: 0 1 auto` (shrinks but never grows past its content) and the Gantt
   card is `flex: 1 1 auto` with a `min-height` floor so the timeline is never
   crushed off-screen. The prep list (`.prep-todo`) is the only internal scroll,

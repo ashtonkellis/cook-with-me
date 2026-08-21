@@ -36,12 +36,15 @@ body {
   /* Disable double-tap-to-zoom (keeps pinch-zoom) so rapid taps on the ±15s /
      pause controls register immediately instead of being treated as a zoom. */
   touch-action: manipulation;
-  /* Fit the whole app on one screen — no page scroll. Size to the *dynamic*
-     viewport so the body always fills what's actually visible (svh is the
-     smallest and left a gap when Safari's chrome collapsed). */
+  /* Fit the whole app on one screen — no page scroll. Prefer the dynamic
+     viewport, but on some iOS contexts (in-app browsers, standalone PWAs, older
+     Safari) dvh resolves SHORT and leaves a gap at the bottom. `--app-h` is set
+     from window.innerHeight in JS and wins when present, so the body always
+     fills the real visible height. */
   height: 100vh;
   height: 100svh;
   height: 100dvh;
+  height: var(--app-h, 100dvh);
   display: flex;
   flex-direction: column;
   overflow: hidden;

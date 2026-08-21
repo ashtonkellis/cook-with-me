@@ -837,9 +837,23 @@ el.pickerClose.addEventListener('click', closePicker);
 el.pickerDone.addEventListener('click', closePicker);
 
 // ---------- Boot ----------
+// Pin the app to the REAL visible height. `100dvh` resolves short in some iOS
+// contexts (in-app browsers, standalone PWAs, older Safari), leaving a gap at
+// the bottom and crushing the timeline; window.innerHeight is always the true
+// visible height. Update on resize / rotation / foreground.
+function syncAppHeight() {
+  const h = window.innerHeight;
+  if (h) document.documentElement.style.setProperty('--app-h', h + 'px');
+}
+
 function init() {
   const vEl = document.getElementById('version');
   if (vEl) vEl.textContent = 'V' + (self.APP_VERSION || '0');
+
+  syncAppHeight();
+  window.addEventListener('resize', syncAppHeight);
+  window.addEventListener('orientationchange', syncAppHeight);
+  window.addEventListener('pageshow', syncAppHeight);
 
   meal = loadMeal();
   schedule = computeSchedule(meal);
@@ -862,9 +876,15 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Re-sync when the app returns to foreground (wall clock may have jumped).
+// Re-sync when the app returns to foreground (wall clock may have jumped, and
+// the visible height may have changed while backgrounded).
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && isRunning()) refresh();
+  if (document.hidden) return;
+  syncAppHeight();
+  if (isRunning()) refresh();
 });
 
 init();
+// Re-measure once the viewport settles (iOS reports innerHeight late on load).
+window.addEventListener('load', syncAppHeight);
+setTimeout(syncAppHeight, 300);

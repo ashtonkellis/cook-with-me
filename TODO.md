@@ -20,6 +20,12 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Fix app not filling the screen on device (V29)** — on device the app left
+      empty space below the footer and crushed the Gantt lanes because `100dvh`
+      resolves short in some iOS contexts (in-app browsers, standalone PWAs, older
+      Safari). Now the body height is pinned to the real `window.innerHeight` via a
+      JS-set `--app-h` variable (updated on load/resize/rotate/foreground), so the
+      app fills the full visible height and the timeline gets its space back.
 - [x] **Remove completed prep from the list + shrink-to-fit Gantt (V28)** —
   - Completing a prep task now **removes it from the list** (only pending tasks
     show); done tasks live behind a **"▸ Show N completed"** toggle. The list
