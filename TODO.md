@@ -20,6 +20,13 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Distinguish chicken breast vs thighs + casing audit (V32)** —
+  - Chicken breast now uses a distinct emoji (🐔 vs 🍗 thighs), and Gantt lane
+    names wrap to 2 lines so "…thighs" / "…breast" is readable instead of both
+    truncating to "BBQ chicke…".
+  - Casing audit: the UI was already sentence-case-consistent from prior rounds;
+    standardized the two remaining lowercase outliers (Gantt "Shared" block
+    label, now-line "Done" flag). Documented the casing convention in CLAUDE.md.
 - [x] **Add Steak dish (V31)** — prep: "Season the meat"; timed: "Preheat the
       grill" (5m, same as chicken), "Cook side 1" (8m), "Cook side 2" (8m), "Let
       rest" (5m). `included: false` by default (available in the picker). Its 26m

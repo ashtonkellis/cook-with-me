@@ -75,7 +75,10 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
   - `shared` — same-labeled shared steps across included dishes are one physical
     task, owned by the earliest dish; redundant copies are skipped/auto-done.
   - `included` picks which dishes are in the meal (chosen in the picker modal).
-  Emoji is the per-dish "image". Seed dishes: BBQ chicken thighs, BBQ chicken
+  Emoji is the per-dish "image" — thighs 🍗 vs breast 🐔 differ on purpose so the
+  two chicken dishes are easy to tell apart; Gantt lane names also wrap to 2 lines
+  (`.gn` line-clamp) so "…thighs" vs "…breast" is readable, not truncated to "BBQ
+  chicke…". Seed dishes: BBQ chicken thighs, BBQ chicken
   breast + Steak (extras — `included: false` by default), Rice, Stir-fried
   veggies. Both chicken dishes share "Preheat BBQ" (done once when both are in);
   Steak's preheat is a separate "Preheat the grill" step (own label, so it does
@@ -131,6 +134,11 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
 - Match the Wing Weather visual language: dark stacked cards, status pills, a
   colored left accent bar per card, big tabular-nums countdowns.
 - Keep it dependency-free and buildless so GitHub Pages serves it as-is.
+- **Text casing**: sentence case everywhere (capitalize the first word of a
+  phrase/label; number-led phrases keep the number first — "3 prep left"). Proper
+  nouns keep their caps (BBQ, Instant Pot). ALL-CAPS is only via CSS
+  `text-transform` for section labels (`.hero-label`) and pills (`.ahead-tag` /
+  `.tn-count.over`) — don't hardcode uppercase in strings.
 - **One-screen fit (no scroll)**: `body` is `height: var(--app-h, 100dvh);
   overflow: hidden`, a flex column of header / `main` / footer. `--app-h` is set
   from `window.innerHeight` in JS (`syncAppHeight`, on load/resize/rotate/

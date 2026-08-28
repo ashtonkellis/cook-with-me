@@ -21,7 +21,7 @@ const EXAMPLE_MEAL = {
       ],
     },
     {
-      id: 'chicken-breast', name: 'BBQ chicken breast', emoji: '🍗', included: false,
+      id: 'chicken-breast', name: 'BBQ chicken breast', emoji: '🐔', included: false,
       steps: [
         { label: 'Prep & season chicken', minutes: 5, prep: true, note: 'Pat dry, salt + rub, bring to room temp.' },
         { label: 'Preheat BBQ', minutes: 5, shared: true, note: 'Medium-high, ~450°F. Oil the grates.' },
@@ -651,7 +651,7 @@ function renderGantt(prog) {
       const isShared = run.started && (s.state === 'shared' || s.state === 'shared-done');
       const cls = `gseg${run.started ? ' ' + s.state : ''}${isSel ? ' sel' : ''}`;
       const prefix = done ? '✓ ' : (s.state === 'shared-done' ? '✓ ' : (s.state === 'shared' ? '↔ ' : ''));
-      const label = isShared ? `${prefix}shared` : `${prefix}${escapeHtml(s.label)}`;
+      const label = isShared ? `${prefix}Shared` : `${prefix}${escapeHtml(s.label)}`;
       const tip = isShared ? `${escapeHtml(s.label)} — shared, done once by another dish` : `${escapeHtml(s.label)} · ${fmtLen(s.lenMs)}${s.note ? ' — ' + escapeHtml(s.note) : ''}`;
       // Every step carries a small info dot; tapping the block shows its details.
       const info = `<span class="seg-i" aria-hidden="true">ⓘ</span>`;
@@ -673,7 +673,7 @@ function renderGantt(prog) {
   const nowLayer = run.started
     ? `<div class="gantt-now-layer">
          <div class="gantt-consumed" style="width:${nowPct}%"></div>
-         <div class="gantt-nowline" style="left:${nowPct}%"><span class="now-flag">${prog.allDone ? 'done' : fmtDur(elapsed)}</span></div>
+         <div class="gantt-nowline" style="left:${nowPct}%"><span class="now-flag">${prog.allDone ? 'Done' : fmtDur(elapsed)}</span></div>
        </div>`
     : '';
 
