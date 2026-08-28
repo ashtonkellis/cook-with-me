@@ -80,10 +80,10 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
   (`.gn` line-clamp) so "…thighs" vs "…breast" is readable, not truncated to "BBQ
   chicke…". Seed dishes: BBQ chicken thighs, BBQ chicken
   breast + Steak (extras — `included: false` by default), Rice, Stir-fried
-  veggies. Both chicken dishes share "Preheat BBQ" (done once when both are in);
-  Steak's preheat is a separate "Preheat the grill" step (own label, so it does
-  NOT merge with the chicken preheat). Steak's timeline (5+8+8 + a 5m "Let rest")
-  is 26m, so it anchors the meal when selected.
+  veggies. BBQ chicken thighs, BBQ chicken breast, and Steak all share the
+  "Preheat BBQ" step (same grill — done once when any of them are in together).
+  Steak's timeline (5+8+8 + a 5m "Let rest") is 26m, so it anchors the meal when
+  selected.
 - **The meal is code-sourced — there is NO in-app editor.** `EXAMPLE_MEAL` in
   `app.js` is the single source of truth for dish/step content; edit dishes by
   pushing changes to that file. The app persists ONLY the per-dish include/

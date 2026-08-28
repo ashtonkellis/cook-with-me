@@ -20,6 +20,10 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Steak shares the chicken "Preheat BBQ" (V33)** — steak's preheat step is
+      now labelled "Preheat BBQ" (was "Preheat the grill"), so it merges with the
+      chicken dishes' shared preheat — you preheat the BBQ once when steak +
+      chicken are cooked together (shows "shared ×N").
 - [x] **Distinguish chicken breast vs thighs + casing audit (V32)** —
   - Chicken breast now uses a distinct emoji (🐔 vs 🍗 thighs), and Gantt lane
     names wrap to 2 lines so "…thighs" / "…breast" is readable instead of both
