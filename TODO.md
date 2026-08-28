@@ -20,6 +20,11 @@ work — new requests go into **Todo**, finished work moves to **Done**.
 
 ## Done
 
+- [x] **Add Steak dish (V31)** — prep: "Season the meat"; timed: "Preheat the
+      grill" (5m, same as chicken), "Cook side 1" (8m), "Cook side 2" (8m), "Let
+      rest" (5m). `included: false` by default (available in the picker). Its 26m
+      timeline anchors the meal when selected; the rest is built into the timeline
+      so it finishes resting exactly when the other dishes are done.
 - [x] **Move Reset to the header (V30)** — the Reset button is now a 🔄 icon in
       the header next to the 🍽️ choose-dishes icon (`requestReset()`, confirms
       unless nothing's started / already done). Removed from the bottom cooking

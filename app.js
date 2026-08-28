@@ -30,6 +30,16 @@ const EXAMPLE_MEAL = {
       ],
     },
     {
+      id: 'steak', name: 'Steak', emoji: '🥩', included: false,
+      steps: [
+        { label: 'Season the meat', minutes: 5, prep: true, note: 'Salt generously, bring to room temp.' },
+        { label: 'Preheat the grill', minutes: 5, shared: true, note: 'Medium-high, ~450°F. Oil the grates.' },
+        { label: 'Cook side 1', minutes: 8, note: 'Sear hard — don’t move it.' },
+        { label: 'Cook side 2', minutes: 8, note: 'Flip once. Pull ~130°F for medium-rare.' },
+        { label: 'Let rest', minutes: 5, note: 'Tent loosely with foil — keeps it juicy before slicing.' },
+      ],
+    },
+    {
       id: 'rice', name: 'Rice', emoji: '🍚', included: true,
       steps: [
         { label: 'Measure & wash rice', minutes: 3, prep: true, note: '2 cups rice, rinse until water runs clear.' },

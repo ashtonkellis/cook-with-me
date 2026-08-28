@@ -12,14 +12,14 @@ await page.goto('http://localhost:8123/', { waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
 console.log('version shown:', (await page.textContent('#version')).trim());
 
-// Picker at startup: 4 dishes in the library (thighs, breast, rice, veggies);
-// 3 selected by default (breast is an off-by-default alternative to thighs).
+// Picker at startup: 5 dishes in the library (thighs, breast, steak, rice,
+// veggies); 3 selected by default (breast + steak are off-by-default extras).
 console.log('picker at startup:', await page.isVisible('#picker .editor-panel'),
   '| dishes:', await page.$$eval('.pick-row', (n) => n.length),
   '| selected:', await page.$$eval('.pick-row.on', (n) => n.length));
 const dishLib = await page.$$eval('.pick-row .pick-name strong', (ns) => ns.map((n) => n.textContent.trim()));
 console.log('dish library:', JSON.stringify(dishLib),
-  /BBQ chicken thighs/.test(dishLib.join()) && /BBQ chicken breast/.test(dishLib.join()) ? 'OK ✓' : 'CHECK');
+  ['BBQ chicken thighs', 'BBQ chicken breast', 'Steak', 'Rice', 'Stir-fried veggies'].every((d) => dishLib.includes(d)) ? 'OK ✓' : 'CHECK');
 // Toggle a dish off/on to persist the meal to localStorage (for later evals).
 await page.click('.pick-row:first-child'); await page.waitForTimeout(60);
 await page.click('.pick-row:first-child'); await page.waitForTimeout(60);

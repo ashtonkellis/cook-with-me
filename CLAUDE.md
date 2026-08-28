@@ -76,8 +76,11 @@ dishes finish at the same moment. Zero build step — plain HTML/CSS/JS.
     task, owned by the earliest dish; redundant copies are skipped/auto-done.
   - `included` picks which dishes are in the meal (chosen in the picker modal).
   Emoji is the per-dish "image". Seed dishes: BBQ chicken thighs, BBQ chicken
-  breast (an alternative — `included: false` by default), Rice, Stir-fried
-  veggies. Both chicken dishes share "Preheat BBQ" (done once when both are in).
+  breast + Steak (extras — `included: false` by default), Rice, Stir-fried
+  veggies. Both chicken dishes share "Preheat BBQ" (done once when both are in);
+  Steak's preheat is a separate "Preheat the grill" step (own label, so it does
+  NOT merge with the chicken preheat). Steak's timeline (5+8+8 + a 5m "Let rest")
+  is 26m, so it anchors the meal when selected.
 - **The meal is code-sourced — there is NO in-app editor.** `EXAMPLE_MEAL` in
   `app.js` is the single source of truth for dish/step content; edit dishes by
   pushing changes to that file. The app persists ONLY the per-dish include/
